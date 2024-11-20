@@ -62,7 +62,7 @@ def kalman(x_esti,P,A,Q,B,u,z,H,R):
 
 
 # Input video
-cap = cv.VideoCapture("../videos/newfly.mp4")
+cap = cv.VideoCapture("../videos/newcrop_flipped.mp4")
 
 
 # Output video

@@ -1,5 +1,9 @@
 # For now, only include src/ and videos/ directories
 
+# Files
+.DS_Store
+
+# Directories
 archive/
 custom_model/
 depthai-python/
