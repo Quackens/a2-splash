@@ -2,6 +2,7 @@
 
 # Files
 .DS_Store
+.__afs*
 
 # Directories
 archive/
