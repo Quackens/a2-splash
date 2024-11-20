@@ -1,0 +1,7 @@
+# For now, only include src/ and videos/ directories
+
+archive/
+custom_model/
+depthai-python/
+out/
+predict/
