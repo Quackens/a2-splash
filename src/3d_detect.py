@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
 import cv2
+import math
 import depthai as dai
 import numpy as np
-stepSize = 0.05
+stepSize = 0.02
 from pathlib import Path
 import time
 import argparse
@@ -55,13 +56,13 @@ xoutVideo.input.setBlocking(False)
 xoutVideo.input.setQueueSize(1)
 
 # Config
-topLeft = dai.Point2f(0.4, 0.4)
-bottomRight = dai.Point2f(0.6, 0.6)
+topLeft = dai.Point2f(0.49, 0.49)
+bottomRight = dai.Point2f(0.51, 0.51)
 
 config = dai.SpatialLocationCalculatorConfigData()
 config.depthThresholds.lowerThreshold = 100
 config.depthThresholds.upperThreshold = 10000
-calculationAlgorithm = dai.SpatialLocationCalculatorAlgorithm.MEDIAN
+calculationAlgorithm = dai.SpatialLocationCalculatorAlgorithm.MEAN
 config.roi = dai.Rect(topLeft, bottomRight)
 
 spatialLocationCalculator.inputConfig.setWaitForMessage(False)
@@ -116,6 +117,13 @@ def detect(frame):
             cv2.circle(frame, center, 5, (0, 0, 255), -1)
             return center
 
+def coordGen(coords, x, y, z):
+    displacement = math.sqrt((x**2) + (y**2))#x, y = spatial cam xy, relative to center
+    realZ = math.sqrt((z**2) - (displacement**2)) #z = spatial cam z, not irl Z
+    return coords, realZ #x, y, z in real world coords
+
+coordList = list()
+
 # Connect to device and start pipeline
 with dai.Device(pipeline) as device:
 
@@ -169,7 +177,7 @@ with dai.Device(pipeline) as device:
             min_depth = np.percentile(depth_downscaled[depth_downscaled != 0], 1)
         max_depth = np.percentile(depth_downscaled, 99)
         depthFrameColor = np.interp(depthFrame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
-        # depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
+        depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
 
         spatialData = spatialCalcQueue.get().getSpatialLocations()
         for depthData in spatialData:
@@ -184,12 +192,26 @@ with dai.Device(pipeline) as device:
             depthMax = depthData.depthMax
 
             fontType = cv2.FONT_HERSHEY_TRIPLEX
-            cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
-            cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
-            cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
-            cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
+            # print("------------------------------new frame----------------")
+            # print("x: "+str(int(depthData.spatialCoordinates.x))+"y: "+str(int(depthData.spatialCoordinates.y))+"z: "+str(int(depthData.spatialCoordinates.z)))
+            if (int(depthData.spatialCoordinates.z)) != 0:
+                cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
+                cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
+                cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
+                cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
+                newCoord = coordGen(coords, int(depthData.spatialCoordinates.x), int(depthData.spatialCoordinates.y), int(depthData.spatialCoordinates.z))
+            if (coords != None):
+                coordList.append(newCoord)
+                print(coordList[-1])
         # Show the frame
         cv2.putText(depthFrameColor, "FPS: {:.2f}".format(fps), (2, depthFrameColor.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
+        
+        #constant ball detection update
+        if coords != None:
+            topLeft = dai.Point2f((xo-10)/frame.shape[1], (yo-10)/frame.shape[0])
+            bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+10)/frame.shape[0])
+            newConfig = True
+
         cv2.imshow("depth", depthFrameColor)
         key = cv2.waitKey(1)
         if key == ord('q'):
@@ -205,8 +227,8 @@ with dai.Device(pipeline) as device:
             # print(depthFrameColor.shape[0], depthFrameColor.shape[1]) = 400, 640
             print((xo-5)/frame.shape[1], (yo-5)/frame.shape[0])
             print(coords)
-            topLeft = dai.Point2f((xo-5)/frame.shape[1], (yo-5)/frame.shape[0])
-            bottomRight = dai.Point2f((xo+5)/frame.shape[1], (yo+5)/frame.shape[0])
+            topLeft = dai.Point2f((xo-10)/frame.shape[1], (yo-10)/frame.shape[0])
+            bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+10)/frame.shape[0])
             newConfig = True
         elif key == ord('3'): 
             # print(depthFrameColor.shape[0], depthFrameColor.shape[1]) = 400, 640
