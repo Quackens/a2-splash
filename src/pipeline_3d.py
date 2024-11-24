@@ -79,7 +79,7 @@ class Pipeline3D:
     def run(self):
         while(True):
             # Assume there is a stream of coordinates arriving at 30 per second
-            xo, yo, zo = self.queue.get_next()
+            xo, yo, zo = self.queue.get_frame()
 
             if xo is None and yo is None and zo is None:
                 continue
@@ -112,7 +112,10 @@ class Pipeline3D:
             x_pred = [mu2[0] for mu2, _ in res2]
             y_pred = [mu2[1] for mu2, _ in res2]
             z_pred = [mu2[2] for mu2, _ in res2]
-
+            
+            with open("../out/3d_pred", "w") as f:
+                for i in range(len(x_estimate)):
+                    f.write(f"{x_estimate[i]} {y_estimate[i]} {z_estimate[i]} - {x_pred[i]} {y_pred[i]} {z_pred[i]}\n")
             # Would be a good idea to add the uncertainty of the prediction?
             # x_pred_uncertainty = [2 * np.sqrt(P2[0, 0]) for _, P2 in res2]
             # y_pred_uncertainty = [2 * np.sqrt(P2[1, 1]) for _, P2 in res2]

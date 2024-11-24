@@ -1,196 +1,123 @@
 import cv2 as cv
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter
-import time 
-import numpy.linalg as la
-import imutils
+from camera_queue import CameraQueue
 
-def detect(frame):
-    # print(frame)
-    orangeLower = (6, 150, 200)
-    orangeUpper = (25, 255, 255)
-    blurred = cv.GaussianBlur(frame, (11, 11), 0)
-    hsv = cv.cvtColor(blurred, cv.COLOR_BGR2HSV)
-
-    # construct a mask for the color "green", then perform
-    # a series of dilations and erosions to remove any small
-    # blobs left in the mask
-    mask = cv.inRange(hsv, orangeLower, orangeUpper)
-    mask = cv.erode(mask, None, iterations=2)
-    mask = cv.dilate(mask, None, iterations=2)
-    # cv.imshow("orange", mask)
-    # find contours in the mask and initialize the current
-    # (x, y) center of the ball
-    cnts = cv.findContours(mask.copy(), cv.RETR_EXTERNAL,
-        cv.CHAIN_APPROX_SIMPLE)
-    cnts = imutils.grab_contours(cnts)
-    center = None
-
-    # only proceed if at least one contour was found
-    if len(cnts) > 0:
-        # find the largest contour in the mask, then use
-        # it to compute the minimum enclosing circle and
-        # centroid
-        c = max(cnts, key=cv.contourArea)
-        ((x, y), radius) = cv.minEnclosingCircle(c)
-        M = cv.moments(c)
-        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-
-        # only proceed if the radius meets a minimum size
-        if radius > 10 and center != None:
-            return center
-
-def kalman(x_esti,P,A,Q,B,u,z,H,R):
-
-    x_pred = A @ x_esti + B @ u;         # B : controlMatrix -->  B @ u : gravity
-    #  x_pred = A @ x_esti or  A @ x_esti - B @ u : upto
-    P_pred  = A @ P @ A.T + Q;
-
-    zp = H @ x_pred
-
-    # si no hay observación solo hacemos predicción 
-    if z is None:
-        return x_pred, P_pred, zp
-
-    epsilon = z - zp
-
-    k = P_pred @ H.T @ la.inv(H @ P_pred @ H.T +R)
-
-    x_esti = x_pred + k @ epsilon;
-    P  = (np.eye(len(P))-k @ H) @ P_pred;
-    return x_esti, P, zp
-
-
-# Input video
-cap = cv.VideoCapture("../videos/newcrop_flipped.mp4")
-
-
-# Output video
-width = cap.get(cv.CAP_PROP_FRAME_WIDTH)
-height = cap.get(cv.CAP_PROP_FRAME_HEIGHT)
-myvideo=cv.VideoWriter("../out/vidout.avi", cv.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
-
-
-
-
-###################### Kalman Initialization ########################
-
-fps = 60
-dt = 1/fps
-# t = np.arange(0,2.01,dt)
-noise = 3
-
-# A : transitionMatrix
-A = np.array(
-    [1, 0, dt, 0,
-    0, 1, 0, dt,
-    0, 0, 1, 0,
-    0, 0, 0, 1 ]).reshape(4,4)
-
-# Adjust A to fit vertical velocity
-a = np.array([0, 195])
-# B : controlMatrix
-B = np.array(
-    [dt**2/2, 0,
-    0, dt**2/2,
-    dt, 0,
-    0, dt ]).reshape(4,2)
-# H : measurementMatrix
-H = np.array(
-    [1,0,0,0,
-    0,1,0,0]).reshape(2,4)
-
-# x, y, vx, vy
-mu = np.array([0,0,0,0])
-P = np.diag([1000,1000,1000,1000])**2
-res=[]
-
-sigmaM = 0.0001
-sigmaZ = 3*noise
-
-Q = sigmaM**2 * np.eye(4)   # processNoiseCov
-R = sigmaZ**2 * np.eye(2)   # measurementNoiseCov
-listCenterX=[]
-listCenterY=[]
-listpuntos=[]
-
-add_count = 0
-while(True):
+class Pipeline3D:
     
-    ret, frame = cap.read()
-    if not ret: break
-    xo, yo = None, None
-    if (frame is None): 
-        # cv.imshow('Frame', frame)
-        myvideo.write(frame)
-        continue
-    # print(frame)
-    coords = detect(frame)
-    if coords == None:
-        # cv.imshow('Frame', frame)
-        myvideo.write(frame)
-        continue
-    else:
-        xo, yo = coords
+    def __init__(self, queue):
+        fps = 60
+        dt = 1/fps
+        noise = 3
+        sigmaM = 0.0001
+        sigmaZ = 3*noise
+        ac = dt**2/2
+
+        self.queue = queue
+
+        # A : transitionMatrix
+        self.A = np.array(
+                [1, 0, dt, 0,
+                0, 1, 0, dt,
+                0, 0, 1, 0,
+                0, 0, 0, 1 ]).reshape(4,4)
+
+        # Adjust A to fit vertical velocity, maybe depth velocity?
+        self.a = np.array([0, 195])
+
+        # B : controlMatrix
+        self.B = np.array(
+                [dt**2/2, 0,
+                0, dt**2/2,
+                dt, 0,
+                0, dt ]).reshape(4,2)
+
+        # H : measurementMatrix
+        self.H = np.array(
+                [1, 0, 0, 0,
+                0, 1, 0, 0]).reshape(2,4)
+
+        # x, y, z, vx, vy, vz
+        self.mu = np.array([0, 0, 0, 0, 0, 0])
+        self.P = 1000 ** 2 * np.eye(6)
+        self.res=[]
+
+        self.Q = sigmaM**2 * np.eye(6)   # processNoiseCov
+        self.R = sigmaZ**2 * np.eye(3)   # measurementNoiseCov
+        self.listCenterX=[]
+        self.listCenterY=[]
+        self.listCenterZ=[]
+
+    def kalman(x_esti,P,A,Q,B,u,z,H,R):
+        # B : controlMatrix -->  B @ u : gravity
+        x_pred = A @ x_esti + B @ u       
+        #  x_pred = A @ x_esti or  A @ x_esti - B @ u : upto
+        P_pred  = A @ P @ A.T + Q
+
+        zp = H @ x_pred
+
+        # If no observation, then just make a prediction 
+        if z is None:
+            return x_pred, P_pred, zp
+
+        epsilon = z - zp
+
+        k = P_pred @ H.T @ np.linalg.inv(H @ P_pred @ H.T +R)
+
+        x_esti = x_pred + k @ epsilon
+        P  = (np.eye(len(P))-k @ H) @ P_pred
+        return x_esti, P, zp
 
 
+    def run(self):
+        while(True):
+            # Assume there is a stream of coordinates arriving at 30 per second
+            xo, yo, zo = self.queue.get_frame()
 
-    if xo is not None and yo is not None:
-        mu,P,pred= kalman(mu,P,A,Q,B,a,np.array([xo,yo]),H,R)
-        listCenterX.append(xo)
-        listCenterY.append(yo)
+            if xo is None and yo is None and zo is None:
+                continue
 
-        res += [(mu,P)]
+            self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo, zo]), self.H, self.R)
+            self.listCenterX.append(xo)
+            self.listCenterY.append(yo)
+            self.listCenterZ.append(zo)
 
-        ##### Prediction #####
-        mu2 = mu
-        P2 = P
-        res2 = []
+            self.res += [(self.mu, self.P)]
 
-        for _ in range(120*2):
-            mu2,P2,pred2= kalman(mu2,P2,A,Q,B,a,None,H,R)
-            res2 += [(mu2,P2)]
+            # Prediction
+            mu2 = self.mu
+            P2 = self.P
+            res2 = []
+
+            for _ in range(240):
+                mu2, P2, _ = self.kalman(mu2, P2, self.A, self.Q, self.B, self.a, None, self.H, self.R)
+                res2 += [(mu2, P2)]
+
+            x_estimate = [mu[0] for mu, _ in self.res]
+            y_estimate = [mu[1] for mu, _ in self.res]
+            z_estimate = [mu[2] for mu, _ in self.res]
+
+            # Would be a good idea to add the uncertainty of the estimate?
+            # x_uncertainty = [2 * np.sqrt(P[0, 0]) for _, P in res]
+            # y_uncertainty = [2 * np.sqrt(P[1, 1]) for _, P in res]
+            # z_uncertainty = [2 * np.sqrt(P[2, 2]) for _, P in res]
+
+            x_pred = [mu2[0] for mu2, _ in res2]
+            y_pred = [mu2[1] for mu2, _ in res2]
+            z_pred = [mu2[2] for mu2, _ in res2]
             
-        xe = [mu[0] for mu,_ in res]
-        xu = [2*np.sqrt(P[0,0]) for _,P in res]
-        ye = [mu[1] for mu,_ in res]
-        yu = [2*np.sqrt(P[1,1]) for _,P in res]
-        
-        xp=[mu2[0] for mu2,_ in res2]
-        yp=[mu2[1] for mu2,_ in res2]
+            with open("../out/3d_pred", "w") as f:
+                for i in range(len(x_estimate)):
+                    f.write(f"{x_estimate[i]} {y_estimate[i]} {z_estimate[i]} - {x_pred[i]} {y_pred[i]} {z_pred[i]}\n")
+            # Would be a good idea to add the uncertainty of the prediction?
+            # x_pred_uncertainty = [2 * np.sqrt(P2[0, 0]) for _, P2 in res2]
+            # y_pred_uncertainty = [2 * np.sqrt(P2[1, 1]) for _, P2 in res2]
+            # z_pred_uncertainty = [2 * np.sqrt(P2[2, 2]) for _, P2 in res2]
 
-        xpu = [2*np.sqrt(P[0,0]) for _,P in res2]
-        ypu = [2*np.sqrt(P[1,1]) for _,P in res2]
+            # Draw the trajectory
+            
+            # Output:
+            # listCenterX, listCenterY, listCenterZ (For where the ball is in the frame at each time step)
+            # x_estimate, y_estimate, z_estimate (For where the ball is in next step)
+            # x_pred, y_pred, z_pred (For where the ball is in the future for the next 240 iterations)
 
-        for n in range(len(listCenterX)): # Track centre of ball
-            cv.circle(frame,(int(listCenterX[n]),int(listCenterY[n])),3,(0, 255, 0),-1)
-
-
-        for n in [-1]:#range(len(xe)): # Estimate ball
-            incertidumbre=(xu[n]+yu[n])/2
-            cv.circle(frame,(int(xe[n]),int(ye[n])),int(incertidumbre),(255, 255, 0),1)
-
-        for n in range(len(xp)): # estimate trajectory
-            incertidumbreP=(xpu[n]+ypu[n])/2
-            # cv.circle(frame,(int(xp[n]),int(yp[n])),int(incertidumbreP),(0, 0, 255))
-            cv.circle(frame,(int(xp[n]),int(yp[n])),1,(0, 0, 255))
-
-        # if(len(listCenterY)>40):
-        #     if ((listCenterX[-3] > listCenterX[-2]) and (listCenterX[-1] > listCenterX[-2])) or (abs(listCenterY[-1] - listCenterY[-2]) < 5) and (abs(listCenterY[-2] - listCenterY[-3]) < 5) :
-        #         print("REBOTE")
-        #         listCenterY=[]
-        #         listCenterX=[]
-        #         listpuntos=[]
-        #         res=[]
-        #         mu = np.array([0,0,0,0])
-        #         P = np.diag([100,100,100,100])**2
-
-    # time.sleep(0.1)
-    # cv.imshow('ColorMask',colorMask)
-    # #cv.imshow(’ColorMask’,cv.resize(colorMask,(800,600)))
-    # cv.imshow('mask', bgs)
-    #cv.imshow(’Frame’,cv.resize(frame,(800,600)))
-    # cv.imshow('Frame', frame)
-    myvideo.write(frame)
-
-cv.destroyAllWindows()
+    
