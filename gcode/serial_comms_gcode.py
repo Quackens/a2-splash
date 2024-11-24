@@ -1,5 +1,6 @@
 import serial
 import time
+import random
 
 # Taken from https://projecthub.arduino.cc/ansh2919/serial-communication-between-python-and-arduino-663756
 # arduino = serial.Serial(port='COM7', baudrate= 115200, timeout=.1)
@@ -41,11 +42,31 @@ def grbl_init(s):
     gcode_send(s, 'G94') # units per minute feed rate mode
     gcode_send(s, '$H')  # do homing
     
-    gcode_send(s, "F2000") # Set feed rate. for some reason, has to be low right after homing
+    gcode_send(s, "F2000") # Set feed rate. for some reason, has to be reduced right after homing
     gcode_send(s, GOTO_ZERO) # Go to zero zero
     gcode_send(s, PAUSE_1S)
     gcode_send(s, "F3750") # Set feed rate for normal operation
     return
+
+def random_move(s):
+    x = (random.random() - 0.5) * 2 # [-1, 1]
+    x *= 7 # [-7, 7]
+    y = (random.random() - 0.5) * 2 # [-1, 1]
+    y *= 7 # [-7, 7]
+
+    for i in range(5): # roughly simulate increasingly better coordinates
+        print(x, y)
+        gcode_goto(s, x, y)
+        dx = (random.random() - 0.5) * 2 * 2
+        dy = (random.random() - 0.5) * 2 * 2
+        x += dx
+        y += dy
+
+        # ensure safe bounds
+        if x < -10: x = -10
+        elif x > 10: x = 10
+        if y < -10: y = -10
+        elif y > 10: y = 10 
 
 
 def main():
@@ -61,13 +82,15 @@ def main():
     while True: # user input loop
         cmd = input("\nEnter command to send to grbl: ").strip()
         if cmd == "q": break
+        elif cmd == "r": random_move(s)
         elif cmd[0].lower() == "c": # goto X Y
             c, x, y = cmd.split(" ")
             gcode_goto(s, float(x), float(y))
         else: # send RAW gcode command
             gcode_send(s, cmd)
+        # gcode_goto(s, 0, 0)
         gcode_send(s, PAUSE_1S)
-        gcode_send(s, GOTO_ZERO)
+    
 
     # Close file and serial port
     s.close()
