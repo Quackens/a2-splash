@@ -63,7 +63,7 @@ def main():
         if cmd == "q": break
         elif cmd[0].lower() == "c": # goto X Y
             c, x, y = cmd.split(" ")
-            gcode_goto(s, int(x), int(y))
+            gcode_goto(s, float(x), float(y))
         else: # send RAW gcode command
             gcode_send(s, cmd)
         gcode_send(s, PAUSE_1S)
