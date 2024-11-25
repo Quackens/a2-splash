@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 g = 9.81  # Acceleration due to gravity (m/s^2)
-v0 = 2.5   # Initial velocity (m/s)
+v0 = 5   # Initial velocity (m/s)
 launch_angle = 45  
 initial_height = 0
 k = 1.225 # Air resistance constant (tune this value as needed, depending on the projectile and environment)

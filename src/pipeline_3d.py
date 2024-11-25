@@ -1,6 +1,6 @@
 import cv2 as cv
 import numpy as np
-from camera_queue import CameraQueue
+from queue_utils import CameraQueue
 
 class Pipeline3D:
     
@@ -55,7 +55,7 @@ class Pipeline3D:
         self.listCenterY=[]
         self.listCenterZ=[]
 
-    def kalman(x_esti,P,A,Q,B,u,z,H,R):
+    def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
         # B : controlMatrix -->  B @ u : gravity
         x_pred = A @ x_esti + B @ u       
         #  x_pred = A @ x_esti or  A @ x_esti - B @ u : upto
@@ -77,10 +77,15 @@ class Pipeline3D:
 
 
     def run(self):
+        with open("../out/3d_pred", "w") as f:
+            f.write("Actual: Predicted:\n")
+            
         while(True):
             # Assume there is a stream of coordinates arriving at 30 per second
-            xo, yo, zo = self.queue.get_frame()
-
+            frame = self.queue.get_frame()
+            if frame is None:
+                continue
+            xo, yo, zo, _ = frame
             if xo is None and yo is None and zo is None:
                 continue
 
@@ -113,9 +118,9 @@ class Pipeline3D:
             y_pred = [mu2[1] for mu2, _ in res2]
             z_pred = [mu2[2] for mu2, _ in res2]
             
-            with open("../out/3d_pred", "w") as f:
-                for i in range(len(x_estimate)):
-                    f.write(f"{x_estimate[i]} {y_estimate[i]} {z_estimate[i]} - {x_pred[i]} {y_pred[i]} {z_pred[i]}\n")
+            with open("../out/3d_pred", "a") as f:
+                for i in range(len(x_pred)):
+                    f.write(f"{x_estimate[-1]} {y_estimate[-1]} {z_estimate[-1]}: {x_pred[i]} {y_pred[i]} {z_pred[i]}\n")
             # Would be a good idea to add the uncertainty of the prediction?
             # x_pred_uncertainty = [2 * np.sqrt(P2[0, 0]) for _, P2 in res2]
             # y_pred_uncertainty = [2 * np.sqrt(P2[1, 1]) for _, P2 in res2]

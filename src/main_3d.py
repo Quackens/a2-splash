@@ -1,5 +1,5 @@
 from pipeline_3d import Pipeline3D
-from camera_queue import CameraQueue
+from queue_utils import CameraQueue
 from projectile_sim import projectile_motion_with_air_resistance, v0, launch_angle, initial_height, k, mass
 
 # Testing stuff
