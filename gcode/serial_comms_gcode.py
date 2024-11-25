@@ -49,6 +49,7 @@ def grbl_init(s):
     gcode_send(s, "F3750") # Set feed rate for normal operation
     return
 
+# used to verify positional accuracy and translation speed
 def random_radius(s):
     max_radius = 10 # 10cm
     r = random.random() * max_radius # [0, 10]
@@ -62,6 +63,8 @@ def random_radius(s):
     print(x, y)
     gcode_goto(s, x, y)
 
+# used to demonstrate queued movements simulating incrementally better prediction coordinates
+# grbl has a 128 character RX buffer that supports this
 def random_move(s):
     x = (random.random() - 0.5) * 2 # [-1, 1]
     x *= 7 # [-7, 7]
