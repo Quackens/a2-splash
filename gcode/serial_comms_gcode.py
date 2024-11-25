@@ -1,6 +1,7 @@
 import serial
 import time
 import random
+import math
 
 # Taken from https://projecthub.arduino.cc/ansh2919/serial-communication-between-python-and-arduino-663756
 # arduino = serial.Serial(port='COM7', baudrate= 115200, timeout=.1)
@@ -48,6 +49,19 @@ def grbl_init(s):
     gcode_send(s, "F3750") # Set feed rate for normal operation
     return
 
+def random_radius(s):
+    max_radius = 10 # 10cm
+    r = random.random() * max_radius # [0, 10]
+    angle = random.random() * 2*math.pi # [0, 2pi]
+
+    x = r * math.cos(angle)
+    y = r * math.sin(angle)
+
+    x = round(x, 2) # 2 decimal points... 0.1mm precision
+    y = round(y, 2) # 2 decimal points... 0.1mm precision
+    print(x, y)
+    gcode_goto(s, x, y)
+
 def random_move(s):
     x = (random.random() - 0.5) * 2 # [-1, 1]
     x *= 7 # [-7, 7]
@@ -83,6 +97,7 @@ def main():
         cmd = input("\nEnter command to send to grbl: ").strip()
         if cmd == "q": break
         elif cmd == "r": random_move(s)
+        elif cmd == "rr": random_radius(s)
         elif cmd[0].lower() == "c": # goto X Y
             c, x, y = cmd.split(" ")
             gcode_goto(s, float(x), float(y))
