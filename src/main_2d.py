@@ -15,9 +15,11 @@ import numpy.linalg as la
 from pipeline_2d import Pipeline2D
 from queue_utils import CameraQueue2D, CoordQueue2D, FrameQueue
 from threading import Thread
-
+from detect import detect_frame
 # Taken from https://projecthub.arduino.cc/ansh2919/serial-communication-between-python-and-arduino-663756
 # arduino = serial.Serial(port='COM7', baudrate= 115200, timeout=.1)
+import json
+import sys
 
 PAUSE_1S = "G4 P1"
 GOTO_ZERO = "G1 X0 Y0"
@@ -110,15 +112,18 @@ def feed_frames():
     # Properties
     camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
     camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-    # camRgb.setVideoSize(1920, 1080)
-    camRgb.setVideoSize(1200, 800)
+    camRgb.setVideoSize(1920, 1080)
+    # camRgb.setVideoSize(1200, 800)
     # camRgb.setVideoSize(640, 400)
     camRgb.setFps(60)
+    # With detect and kalman, 15fps without imshow, 12fps with imshow
     xoutVideo.input.setBlocking(False)
     xoutVideo.input.setQueueSize(1)
     # Linking
     camRgb.video.link(xoutVideo.input)
-
+    # Delete previous file
+    Path("coords").unlink(missing_ok=True)
+    
     with dai.Device(pipeline) as device:
         video = device.getOutputQueue(name="video", maxSize=1, blocking=False)
         startTime = time.monotonic()
@@ -137,11 +142,24 @@ def feed_frames():
                 fps = counter / (current_time - startTime)
                 counter = 0
                 startTime = current_time
-            cv2.putText(frame, "FPS: {:.2f}".format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
+            # print(f"FPS: {fps}")
+            # cv2.putText(frame, "FPS: {:.2f}".format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
             # cv2.imshow("video", frame)
             # print("feeding frame")
-            print("got here")
-            frame_queue.put_frame(frame)
+            # print("got here")
+            # ?try:
+
+            coord = detect_frame(frame)
+            coord_queue.put_coord(coord)
+            with open("coords", "a") as f:
+                if coord:
+                    f.write(f"[{coord[0]}, {coord[1]}],\n")
+                else:
+                    f.write("null,\n")
+            
+            # frame_queue.put_frame(frame)
+            # except:
+            #     continue
 
             # debug_frame = debug_queue.get_frame()
             # cv2.imshow("debug", debug_frame)
@@ -171,28 +189,33 @@ if __name__ == '__main__':
     #     gcode_send(s, GOTO_ZERO)
     
     ################# Prediction Pipeline Setup #################
-    frame_queue = FrameQueue()
+    # frame_queue = FrameQueue()
+    coord_queue = CoordQueue2D()
     result_queue = CoordQueue2D()
     debug_queue = FrameQueue()
-    predict = Pipeline2D(frame_queue, result_queue, debug_queue)
+    predict = Pipeline2D(coord_queue, result_queue, debug_queue)
     
 
 
     ################# Connect to device and start pipeline #################
     # Output video
-    width = 1200
-    height = 800
+    width = 1920
+    height = 1080
     myvideo=cv2.VideoWriter("/out/vidout.avi", cv2.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
 
-
-
     # Main Thread: Start pipeline and get frames, and send to serializer
-    # Thread(target=predict.run).start()
-    Thread(target=serialize_loop).start()
-    Thread(target=feed_frames).start()
-    # Thread(target=predict.run).start()
-    predict.run()
-    # feed_frames()
+
+    
+    if sys.argv[1] == "live":
+        Thread(target=serialize_loop).start()
+        Thread(target=feed_frames).start()
+        predict.run()
+    elif sys.argv[1] == "test":
+        # Load in json file
+        with open("datalist.json", "r") as f:
+            data = json.load(f)
+        
+        predict.test(data[sys.argv[2]])
 
 
 

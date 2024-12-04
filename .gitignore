@@ -10,3 +10,7 @@ custom_model/
 depthai-python/
 out/
 predict/
+
+coords
+datalist.json
+get_video.py
