@@ -19,7 +19,7 @@ CUP_RIGHT_X = 270 # Right edge of the cup in pixels (WxH)
 SAMPLE_TIME = 0.1 # seconds (to put into result queue)
 
 GRAVITY = 9740 # Tuning parameter [a] good for now
-GRAVITY = 8400
+GRAVITY = 8600
 class Pipeline2D:
     
     def __init__(self, coord_queue, result_queue, debug_queue):
@@ -182,15 +182,7 @@ class Pipeline2D:
             # print(f"Queue Length: {self.coord_queue.get_length()}")
 
             canvas = np.zeros((1080,1920,3), dtype=np.uint8)
-            # if frame is None:
-                # print("nothing in frame queue")
-                # self.debug_queue.put_frame(frame)
-                # continue
-            # print('something in frame queue')
-            # print(frame)
-            # self.myvideo.write(frame)
-            # print(coords)
-            # coords = detect_frame(frame)
+
             print(coords)
             if coords is None:
                 # self.debug_queue.put_frame(frame)
@@ -235,8 +227,6 @@ class Pipeline2D:
             
             # Find the x where y = TABLE_HEIGHT
             for n in range(len(x_pred)): # x y predicted
-                # uncertaintyP=(xpu[n]+ypu[n])/2
-                # cv.circle(frame,(int(xp[n]),int(yp[n])),int(uncertaintyP),(0, 0, 255))
                 cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 1,( 0, 0, 255))
 
 
@@ -245,29 +235,15 @@ class Pipeline2D:
             print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
             
             cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
-            # self.myvideo.write(canvas)
+
             cv.imshow("video", canvas)
-            # self.debug_queue.put_frame(frame)
+
             # Push to result queue every SAMPLE_TIME seconds
             if time.time() - last_time_sampled > SAMPLE_TIME:
                 last_time_sampled = time.time()
                 self.result_queue.put_coord((x, TABLE_HEIGHT))
 
-            # with open("../out/3d_pred", "w") as f:
-            #     for i in range(len(x_estimate)):
-            #         f.write(f"{x_estimate[i]} {y_estimate[i]} - {x_pred[i]} {y_pred[i]} {z_pred[i]}\n")
-            # Would be a good idea to add the uncertainty of the prediction?
-            # x_pred_uncertainty = [2 * np.sqrt(P2[0, 0]) for _, P2 in res2]
-            # y_pred_uncertainty = [2 * np.sqrt(P2[1, 1]) for _, P2 in res2]
-            # z_pred_uncertainty = [2 * np.sqrt(P2[2, 2]) for _, P2 in res2]
-
-            # Draw the trajectory
-            
-        
-            # Output:
-            # listCenterX, listCenterY, listCenterZ (For where the ball is in the frame at each time step)
-            # x_estimate, y_estimate, z_estimate (For where the ball is in next step)
-            # x_pred, y_pred, z_pred (For where the ball is in the future for the next 240 iterations)
+    
 
 
 
