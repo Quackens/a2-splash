@@ -131,7 +131,7 @@ class Pipeline2D:
             self.res += [(self.mu, self.P)]
 
             # Prediction
-            print(f"x,y: {xo, yo} mu: {self.mu}")
+            # print(f"x,y: {xo, yo} mu: {self.mu}")
             mu2 = self.mu
             P2 = self.P
             res2 = []
@@ -162,40 +162,31 @@ class Pipeline2D:
 
 
                 cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
-            # self.myvideo.write(canvas)
             cv.imshow("video", canvas)
 
     def run(self):
         last_time_sampled = 0
         time_start = time.time()
         while(True):
-            # if time.time() - time_start > 5:
-            #     break
             key = cv.waitKey(1)
             if key == ord('q'):
                 break
             
             # Assume there is a stream of coordinates arriving at 30 per second
-            # frame = self.frame_queue.get_frame()
             coords = self.coord_queue.get_coord()
-
-            # print(f"Queue Length: {self.coord_queue.get_length()}")
 
             canvas = np.zeros((1080,1920,3), dtype=np.uint8)
 
             print(coords)
             if coords is None:
-                # self.debug_queue.put_frame(frame)
                 cv.imshow("video", canvas)
-                # self.myvideo.write(canvas)
                 continue
             
             xo, yo = coords
             if xo is None and yo is None:
-                # self.debug_queue.put_frame(frame)
                 cv.imshow("video", canvas)
-                # self.myvideo.write(canvas)
                 continue
+
             cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 
             

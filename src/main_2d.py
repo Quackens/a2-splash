@@ -2,52 +2,22 @@
 from pathlib import Path
 import cv2
 import depthai as dai
-import numpy as np
 import time
-import argparse
-import imutils
-from scipy.ndimage.filters import gaussian_filter
-# from kalman import KalmanFilter
-from imutils.video import VideoStream
-import numpy.linalg as la
-# import serial
 
 from pipeline_2d import Pipeline2D
-from queue_utils import CameraQueue2D, CoordQueue2D, FrameQueue
+from queue_utils import CoordQueue2D, FrameQueue
 from threading import Thread
 from detect import detect_frame
-# Taken from https://projecthub.arduino.cc/ansh2919/serial-communication-between-python-and-arduino-663756
-# arduino = serial.Serial(port='COM7', baudrate= 115200, timeout=.1)
+
 import json
 import sys
 
+# TODO: Uncomment to integrate serial
+# import serial
 PAUSE_1S = "G4 P1"
 GOTO_ZERO = "G1 X0 Y0"
 
-'''
-#--------------------------camera setup------------------------------
-# Create pipeline
-pipeline = dai.Pipeline()
-# Define source and output
-camRgb = pipeline.create(dai.node.ColorCamera)
-xoutVideo = pipeline.create(dai.node.XLinkOut)
-xoutVideo.setStreamName("video")
-# Properties
-camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
-camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
-# camRgb.setVideoSize(1920, 1080)
-camRgb.setVideoSize(1200, 800)
-# camRgb.setVideoSize(640, 400)
-camRgb.setFps(60)
-xoutVideo.input.setBlocking(False)
-xoutVideo.input.setQueueSize(1)
-# Linking
-camRgb.video.link(xoutVideo.input)
 
-#----------------------------ball detection + kalman function ----------
-'''
-
-'''
 #-----------------------------arduino setup functions--------------------------
 # send XY coordinate to go to
 def gcode_goto(s, x: float, y: float):
@@ -89,40 +59,62 @@ def grbl_init(s):
     gcode_send(s, "F3750") # Set feed rate for normal operation
     return
 
-'''
-# def serialize_loop(s: serial.Serial, result_queue):
+
 def serialize_loop():
+    # global s 
+    global result_queue
+    # Taken from https://projecthub.arduino.cc/ansh2919/serial-communication-between-python-and-arduino-663756
+    # arduino = serial.Serial(port='COM7', baudrate= 115200, timeout=.1)
+    from pipeline_2d import CUP_LEFT_X, CUP_RIGHT_X, CUP_CENTRE_X
+    print("waiting1 ")
     while True:
+        print("waiting2")
         coord = result_queue.get_coord()
         if coord is None:
             continue
         x, y = coord
+        # Normalize the x, y coordinates
+        if x > CUP_RIGHT_X or x < CUP_LEFT_X:
+            print(f"Invalid x coordinate: {x}")
+            continue
+
+        if x > CUP_CENTRE_X:
+            x = (x) / (CUP_RIGHT_X - CUP_CENTRE_X) * 10
+        else:
+            x = (x) / (CUP_CENTRE_X - CUP_LEFT_X) * 10
+
+        # 2D now so just hardcode
+        y = 0
         # gcode_goto(s, x, y)
         # arduino.write(f"{x} {y}\n".encode())
-        print(f"Sent to arduino: {x} {y}")
+
+        print(f"Sent to arduino: {x} {0}")
 
 
 def feed_frames():
     # Create pipeline
     pipeline = dai.Pipeline()
+
     # Define source and output
     camRgb = pipeline.create(dai.node.ColorCamera)
     xoutVideo = pipeline.create(dai.node.XLinkOut)
     xoutVideo.setStreamName("video")
+
     # Properties
     camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
     camRgb.setResolution(dai.ColorCameraProperties.SensorResolution.THE_1080_P)
     camRgb.setVideoSize(1920, 1080)
-    # camRgb.setVideoSize(1200, 800)
-    # camRgb.setVideoSize(640, 400)
+
     camRgb.setFps(60)
-    # With detect and kalman, 15fps without imshow, 12fps with imshow
+
     xoutVideo.input.setBlocking(False)
+
     xoutVideo.input.setQueueSize(1)
     # Linking
     camRgb.video.link(xoutVideo.input)
+
     # Delete previous file
-    Path("coords").unlink(missing_ok=True)
+    Path("coords.txt").unlink(missing_ok=True)
     
     with dai.Device(pipeline) as device:
         video = device.getOutputQueue(name="video", maxSize=1, blocking=False)
@@ -131,9 +123,6 @@ def feed_frames():
         fps = 0
         frame = None
         while True:
-            # if cv2.waitKey(1) == ord('q'):
-            #     break
-            color = (0, 0, 255)
             videoIn = video.get()
             frame = videoIn.getCvFrame()
             counter+=1
@@ -143,29 +132,21 @@ def feed_frames():
                 counter = 0
                 startTime = current_time
             # print(f"FPS: {fps}")
-            # cv2.putText(frame, "FPS: {:.2f}".format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
-            # cv2.imshow("video", frame)
-            # print("feeding frame")
-            # print("got here")
-            # ?try:
 
             coord = detect_frame(frame)
             coord_queue.put_coord(coord)
-            with open("coords", "a") as f:
+
+            # Writing coordinates to file
+            with open("coords.txt", "a") as f:
                 if coord:
                     f.write(f"[{coord[0]}, {coord[1]}],\n")
                 else:
                     f.write("null,\n")
-            
-            # frame_queue.put_frame(frame)
-            # except:
-            #     continue
 
-            # debug_frame = debug_queue.get_frame()
-            # cv2.imshow("debug", debug_frame)
 
 
 if __name__ == '__main__':
+    # TODO: Uncomment to integrate serial
     '''
     # Open grbl serial port
     s = serial.Serial('COM7',115200)
@@ -174,20 +155,6 @@ if __name__ == '__main__':
     grbl_init(s)
     '''
 
-    # print("Now accepting user input. Enter q to exit")
-    # print("Shortcut to send coordinates: c X Y")
-    # print("Otherwise, send raw GCODE commands")
-    # while True: # user input loop
-    #     cmd = input("\nEnter command to send to grbl: ").strip()
-    #     if cmd == "q": break
-    #     elif cmd[0].lower() == "c": # goto X Y
-    #         c, x, y = cmd.split(" ")
-    #         gcode_goto(s, float(x), float(y))
-    #     else: # send RAW gcode command
-    #         gcode_send(s, cmd)
-    #     gcode_send(s, PAUSE_1S)
-    #     gcode_send(s, GOTO_ZERO)
-    
     ################# Prediction Pipeline Setup #################
     # frame_queue = FrameQueue()
     coord_queue = CoordQueue2D()
@@ -215,11 +182,12 @@ if __name__ == '__main__':
         with open("datalist.json", "r") as f:
             data = json.load(f)
         
+        Thread(target=serialize_loop).start()
         predict.test(data[sys.argv[2]])
 
 
 
 
             
-               
+    # TODO: Uncomment to integrate serial
     # s.close()
