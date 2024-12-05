@@ -46,6 +46,8 @@ stereo.setDefaultProfilePreset(dai.node.StereoDepth.PresetMode.HIGH_DENSITY)
 stereo.setLeftRightCheck(True)
 stereo.setSubpixel(True)
 stereo.setOutputSize(496, 304)
+stereo.setOutputKeepAspectRatio(False)
+stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
 
 downscaleColor = True
 camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
@@ -117,10 +119,10 @@ def detect(frame):
             cv2.circle(frame, center, 5, (0, 0, 255), -1)
             return center
 
-def coordGen(coords, x, y, z):
+def coordGen(xo, yo, x, y, z):
     displacement = math.sqrt((x**2) + (y**2))#x, y = spatial cam xy, relative to center
     realZ = math.sqrt((z**2) - (displacement**2)) #z = spatial cam z, not irl Z
-    return coords, realZ #x, y, z in real world coords
+    return xo, yo, realZ #x, y, z in real world coords
 
 coordList = list()
 
@@ -159,7 +161,7 @@ with dai.Device(pipeline) as device:
         coords = detect(frame) #tuple (x, y) in pixels
         if coords == None:
             # cv2.imshow('Frame', frame)
-            xo, yo = (10, 10)
+            xo, yo = None, None
         else:
             # print(coords)
             # cv2.imshow("Frame", frame)
@@ -196,13 +198,14 @@ with dai.Device(pipeline) as device:
             # print("x: "+str(int(depthData.spatialCoordinates.x))+"y: "+str(int(depthData.spatialCoordinates.y))+"z: "+str(int(depthData.spatialCoordinates.z)))
             if (int(depthData.spatialCoordinates.z)) != 0:
                 cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
-                cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
-                cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
-                cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
-                newCoord = coordGen(coords, int(depthData.spatialCoordinates.x), int(depthData.spatialCoordinates.y), int(depthData.spatialCoordinates.z))
+                # cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
+                # cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
+                # cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
+                newCoord = coordGen(xo, yo, int(depthData.spatialCoordinates.x), int(depthData.spatialCoordinates.y), int(depthData.spatialCoordinates.z))
             if (coords != None):
+                # print(newCoord)
                 coordList.append(newCoord)
-                print(coordList[-1])
+                # print(coordList[-1])
         # Show the frame
         cv2.putText(depthFrameColor, "FPS: {:.2f}".format(fps), (2, depthFrameColor.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
         
@@ -224,12 +227,7 @@ with dai.Device(pipeline) as device:
             bottomRight = dai.Point2f((xo+5)/depthFrameColor.shape[1], (yo+5)/depthFrameColor.shape[0])
             newConfig = True
         elif key == ord('2'): 
-            # print(depthFrameColor.shape[0], depthFrameColor.shape[1]) = 400, 640
-            print((xo-5)/frame.shape[1], (yo-5)/frame.shape[0])
-            print(coords)
-            topLeft = dai.Point2f((xo-10)/frame.shape[1], (yo-10)/frame.shape[0])
-            bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+10)/frame.shape[0])
-            newConfig = True
+            print(coordList)
         elif key == ord('3'): 
             # print(depthFrameColor.shape[0], depthFrameColor.shape[1]) = 400, 640
             # print((xo-5)/depthFrameColor.shape[1], (yo-5)/depthFrameColor.shape[0])
