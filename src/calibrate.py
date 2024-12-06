@@ -51,6 +51,7 @@ with dai.Device(pipeline) as device:
         frame = videoIn.getCvFrame()
         # Get BGR frame from NV12 encoded video frame to show with opencv
         # Visualizing the frame on slower hosts might have overhead
+        cv2.circle(frame, (200, 815), 5, (0, 0, 255), -1)
         if write_video:
             myvideo.write(frame)
         else:

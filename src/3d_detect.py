@@ -191,9 +191,6 @@ with dai.Device(pipeline) as device:
             xmax = int(roi.bottomRight().x)
             ymax = int(roi.bottomRight().y)
 
-            depthMin = depthData.depthMin
-            depthMax = depthData.depthMax
-
             fontType = cv2.FONT_HERSHEY_TRIPLEX
             # print("------------------------------new frame----------------")
             # print("x: "+str(int(depthData.spatialCoordinates.x))+"y: "+str(int(depthData.spatialCoordinates.y))+"z: "+str(int(depthData.spatialCoordinates.z)))

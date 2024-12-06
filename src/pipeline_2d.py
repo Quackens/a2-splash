@@ -8,7 +8,7 @@ import gcode.serial_comms_gcode as serial_comms_gcode
 
 
 # TODO: realign
-TABLE_HEIGHT = 815 # Height of the table in pixels (WxH)
+TABLE_HEIGHT = 852 # Height of the table in pixels (WxH)
 
 CUP_LEFT_X = 102 # Left edge of the cup in pixels (WxH)
 CUP_CENTRE_X = 200 # Centre of the cup in pixels (WxH)
@@ -184,6 +184,7 @@ class Pipeline2D:
         last_time_sampled = 0
         wait_time = 1
         start_time = time.time()
+        last_run = time.time()
 
         print(f"Table Height: {TABLE_HEIGHT}")
 
@@ -194,7 +195,8 @@ class Pipeline2D:
             if key == ord('r'):
                 self.reset(serial)
                 
-                
+            if time.time() - last_run > 2:
+                self.reset(serial)
             
             # Assume there is a stream of coordinates arriving at 30 per second
             coords = self.coord_queue.get_coord()
@@ -207,7 +209,7 @@ class Pipeline2D:
             if coords is None:
                 cv.imshow("video", canvas)
                 continue
-            
+            last_run = time.time()
             xo, yo = coords
             if xo is None and yo is None:
                 cv.imshow("video", canvas)
