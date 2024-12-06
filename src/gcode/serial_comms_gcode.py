@@ -9,13 +9,22 @@ import math
 PAUSE_1S = "G4 P1"
 GOTO_ZERO = "G1 X0 Y0"
 
-# send XY coordinate to go to
-def gcode_goto(s, x: float, y: float):
-    # bounds check
-    if not (-10 <= x <= 10): return -1
-    elif not (-10 <= y <= 10): return -1
+def clamp(value, lower, upper):
+    return max(lower, min(value, upper))
 
-    gcode = 'G1 X' + str(x) + ' Y' + str(y) + '\n'
+# send XZ coordinate to go to
+def gcode_goto(s, x: float, z: float):
+    # transform world space (XZ) to grbl/robot space (XY)
+    # need to invert one axis
+    grbl_x = z
+    grbl_y = -x
+
+    # clamp coordinates to [-10, 10] lower and upper limits
+    grbl_x = clamp(grbl_x, -10.0, 10.0)
+    grbl_y = clamp(grbl_y, -10.0, 10.0)
+
+    # x is a value along the "y-axis", z is a value along the "x axis"
+    gcode = 'G1 X' + str(grbl_x) + ' Y' + str(grbl_y) + '\n'
     s.write(bytes(gcode + '\n', 'utf-8'))
     grbl_out = s.readline() # Wait for grbl response with carriage return
     print(' : ' + str(grbl_out.strip()))
@@ -56,34 +65,32 @@ def random_radius(s):
     angle = random.random() * 2*math.pi # [0, 2pi]
 
     x = r * math.cos(angle)
-    y = r * math.sin(angle)
+    z = r * math.sin(angle)
 
     x = round(x, 2) # 2 decimal points... 0.1mm precision
-    y = round(y, 2) # 2 decimal points... 0.1mm precision
-    print(x, y)
-    gcode_goto(s, x, y)
+    z = round(z, 2) # 2 decimal points... 0.1mm precision
+    print(x, z)
+    gcode_goto(s, x, z)
 
 # used to demonstrate queued movements simulating incrementally better prediction coordinates
 # grbl has a 128 character RX buffer that supports this
 def random_move(s):
     x = (random.random() - 0.5) * 2 # [-1, 1]
     x *= 7 # [-7, 7]
-    y = (random.random() - 0.5) * 2 # [-1, 1]
-    y *= 7 # [-7, 7]
+    z = (random.random() - 0.5) * 2 # [-1, 1]
+    z *= 7 # [-7, 7]
 
     for i in range(5): # roughly simulate increasingly better coordinates
-        print(x, y)
-        gcode_goto(s, x, y)
+        print(x, z)
+        gcode_goto(s, x, z)
         dx = (random.random() - 0.5) * 2 * 2
-        dy = (random.random() - 0.5) * 2 * 2
+        dz = (random.random() - 0.5) * 2 * 2
         x += dx
-        y += dy
+        z += dz
 
         # ensure safe bounds
-        if x < -10: x = -10
-        elif x > 10: x = 10
-        if y < -10: y = -10
-        elif y > 10: y = 10 
+        x = clamp(x, -10.0, 10.0)
+        z = clamp(z, -10.0, 10.0)
 
 
 def main():
@@ -98,12 +105,14 @@ def main():
     print("Otherwise, send raw GCODE commands")
     while True: # user input loop
         cmd = input("\nEnter command to send to grbl: ").strip()
+        print("CMD = " + cmd)
         if cmd == "q": break
         elif cmd == "r": random_move(s)
         elif cmd == "rr": random_radius(s)
+        elif cmd == "z": gcode_goto(s, 0, 0)
         elif cmd[0].lower() == "c": # goto X Y
-            c, x, y = cmd.split(" ")
-            gcode_goto(s, float(x), float(y))
+            c, x, z = cmd.split(" ")
+            gcode_goto(s, float(x), float(z))
         else: # send RAW gcode command
             gcode_send(s, cmd)
         # gcode_goto(s, 0, 0)
