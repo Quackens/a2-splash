@@ -36,21 +36,17 @@ def serialize_loop():
         x, y = coord
         # Normalize the x, y coordinates
         if x > CUP_RIGHT_X:
-            gantry_y = -10
+            gantry_x = 10
         elif x < CUP_LEFT_X:
-            gantry_y = 10
+            gantry_x = -10
         else:
-        # if x > CUP_RIGHT_X or x < CUP_LEFT_X:
-        #     print(f"Invalid x coordinate: {x}")
-        #     continue
+            gantry_x = (x - CUP_CENTRE_X) / 7.5
 
-            gantry_y = - (x - CUP_CENTRE_X) / 7.5
-        gantry_x = 0
 
         # 2D now so just hardcode
-        serial_comms_gcode.gcode_goto(s, gantry_x, gantry_y)
+        serial_comms_gcode.gcode_goto(s, gantry_x, 0)
 
-        print(f"Sent to arduino: {gantry_x} {gantry_y}")
+        print(f"Sent to arduino: {gantry_x} {0}")
 
 
 
