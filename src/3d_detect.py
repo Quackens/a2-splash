@@ -48,7 +48,6 @@ stereo.setSubpixel(True)
 stereo.setOutputSize(496, 304)
 stereo.setOutputKeepAspectRatio(False)
 stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
-stereo.setFps(60)
 
 downscaleColor = True
 camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)
@@ -59,13 +58,15 @@ xoutVideo.input.setBlocking(False)
 xoutVideo.input.setQueueSize(1)
 
 # Config
-topLeft = dai.Point2f(0.49, 0.49)
-bottomRight = dai.Point2f(0.51, 0.51)
+# topLeft = dai.Point2f(0.49, 0.49)
+# bottomRight = dai.Point2f(0.51, 0.51)
+topLeft = dai.Point2f(0.8, 0.3)
+bottomRight = dai.Point2f(0.9, 0.7)
 
 config = dai.SpatialLocationCalculatorConfigData()
 config.depthThresholds.lowerThreshold = 100
 config.depthThresholds.upperThreshold = 10000
-calculationAlgorithm = dai.SpatialLocationCalculatorAlgorithm.MEAN
+calculationAlgorithm = dai.SpatialLocationCalculatorAlgorithm.MIN
 config.roi = dai.Rect(topLeft, bottomRight)
 
 spatialLocationCalculator.inputConfig.setWaitForMessage(False)
@@ -154,11 +155,8 @@ with dai.Device(pipeline) as device:
             counter = 0
             startTime = current_time
         cv2.putText(frame, "FPS: {:.2f}".format(fps), (2, frame.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
+
         xo, yo = None, None
-        # if (frame is None):
-        #     # cv2.imshow('Frame', frame)
-        #     continue
-        # # print(frame)
         coords = detect(frame) #tuple (x, y) in pixels
         if coords == None:
             # cv2.imshow('Frame', frame)
@@ -180,7 +178,6 @@ with dai.Device(pipeline) as device:
             min_depth = np.percentile(depth_downscaled[depth_downscaled != 0], 1)
         max_depth = np.percentile(depth_downscaled, 99)
         depthFrameColor = np.interp(depthFrame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
-        depthFrameColor = cv2.applyColorMap(depthFrameColor, cv2.COLORMAP_HOT)
 
         spatialData = spatialCalcQueue.get().getSpatialLocations()
         for depthData in spatialData:
@@ -190,9 +187,6 @@ with dai.Device(pipeline) as device:
             ymin = int(roi.topLeft().y)
             xmax = int(roi.bottomRight().x)
             ymax = int(roi.bottomRight().y)
-
-            depthMin = depthData.depthMin
-            depthMax = depthData.depthMax
 
             fontType = cv2.FONT_HERSHEY_TRIPLEX
             # print("------------------------------new frame----------------")
@@ -204,8 +198,8 @@ with dai.Device(pipeline) as device:
                 # cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
                 newCoord = coordGen(xo, yo, int(depthData.spatialCoordinates.x), int(depthData.spatialCoordinates.y), int(depthData.spatialCoordinates.z))
             if (coords != None):
-                # print(newCoord)
-                coordList.append(newCoord)
+                print(newCoord)
+                # coordList.append(newCoord)
                 # print(coordList[-1])
         # Show the frame
         cv2.putText(depthFrameColor, "FPS: {:.2f}".format(fps), (2, depthFrameColor.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
@@ -222,10 +216,10 @@ with dai.Device(pipeline) as device:
             break
         elif key == ord('1'): 
             # print(depthFrameColor.shape[0], depthFrameColor.shape[1]) = 400, 640
-            print((xo-5)/depthFrameColor.shape[1], (yo-5)/depthFrameColor.shape[0])
-            print(coords)
-            topLeft = dai.Point2f((xo-5)/depthFrameColor.shape[1], (yo-5)/depthFrameColor.shape[0])
-            bottomRight = dai.Point2f((xo+5)/depthFrameColor.shape[1], (yo+5)/depthFrameColor.shape[0])
+            # print((xo-5)/depthFrameColor.shape[1], (yo-5)/depthFrameColor.shape[0])
+            print(newCoord)
+            # topLeft = dai.Point2f((xo-5)/depthFrameColor.shape[1], (yo-5)/depthFrameColor.shape[0])
+            # bottomRight = dai.Point2f((xo+5)/depthFrameColor.shape[1], (yo+5)/depthFrameColor.shape[0])
             newConfig = True
         elif key == ord('2'): 
             print(coordList)
