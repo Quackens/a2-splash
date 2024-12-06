@@ -48,6 +48,7 @@ stereo.setSubpixel(True)
 stereo.setOutputSize(496, 304)
 stereo.setOutputKeepAspectRatio(False)
 stereo.setDepthAlign(dai.CameraBoardSocket.CAM_A)
+stereo.setFps(60)
 
 downscaleColor = True
 camRgb.setBoardSocket(dai.CameraBoardSocket.CAM_A)

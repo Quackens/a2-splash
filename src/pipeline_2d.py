@@ -3,7 +3,7 @@ import numpy as np
 import queue_utils
 import time 
 from detect import detect_frame
-
+import gcode.serial_comms_gcode as serial_comms_gcode
 
 
 
@@ -69,6 +69,8 @@ class Pipeline2D:
         self.listCenterX=[]
         self.listCenterY=[]
 
+        self.last_prediction = None
+
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
         # B : controlMatrix -->  B @ u : gravity
         x_pred = A @ x_esti + B @ u           
@@ -94,8 +96,16 @@ class Pipeline2D:
         P  = (np.eye(len(P))-k @ H) @ P_pred
         return x_esti, P, zp
 
+    def reset(self, serial):
+        self.mu = np.array([0, 0, 0, 0])
+        self.P = 1000 ** 2 * np.eye(4)
+        serial_comms_gcode.gcode_goto(serial, 0, 0)
+        self.coord_queue.reset_queue()
+        self.last_prediction = None
+
     
     def test(self, data_list):
+        last_prediction = None
         last_time_sampled = 0
         wait_time = 1
         start_time = time.time()
@@ -113,6 +123,7 @@ class Pipeline2D:
                 wait_time = 100
             canvas = np.zeros((1080,1920,3), dtype=np.uint8)
             cv.line(canvas, (CUP_LEFT_X, TABLE_HEIGHT), (CUP_RIGHT_X, TABLE_HEIGHT), (0, 255, 0), 2)
+            cv.circle(canvas, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (255, 255, 0), -1)
             # print(coords)
             if coords is None:
                 cv.imshow("video", canvas)
@@ -153,31 +164,46 @@ class Pipeline2D:
 
             
             
-            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.3:
+            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.4:
                 # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
                 x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
                 print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
                 last_time_sampled = time.time()
                 self.result_queue.put_coord((x, TABLE_HEIGHT))
-
+                
+                if x < CUP_RIGHT_X and x > CUP_LEFT_X:
+                    last_prediction = x
 
                 cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
+            if last_prediction:
+                cv.circle(canvas, (int(last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
             cv.imshow("video", canvas)
 
-    def run(self):
+    def run(self, serial):
+        
         last_time_sampled = 0
-        time_start = time.time()
+        wait_time = 1
+        start_time = time.time()
+
+        print(f"Table Height: {TABLE_HEIGHT}")
+
         while(True):
             key = cv.waitKey(1)
             if key == ord('q'):
                 break
+            if key == ord('r'):
+                self.reset(serial)
+                
+                
             
             # Assume there is a stream of coordinates arriving at 30 per second
             coords = self.coord_queue.get_coord()
 
-            canvas = np.zeros((1080,1920,3), dtype=np.uint8)
 
-            print(coords)
+            canvas = np.zeros((1080,1920,3), dtype=np.uint8)
+            cv.line(canvas, (CUP_LEFT_X, TABLE_HEIGHT), (CUP_RIGHT_X, TABLE_HEIGHT), (0, 255, 0), 2)
+            cv.circle(canvas, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (255, 255, 0), -1)
+            # print(coords)
             if coords is None:
                 cv.imshow("video", canvas)
                 continue
@@ -186,10 +212,8 @@ class Pipeline2D:
             if xo is None and yo is None:
                 cv.imshow("video", canvas)
                 continue
-
             cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 
-            
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
             self.listCenterX.append(xo)
             self.listCenterY.append(yo)
@@ -197,6 +221,7 @@ class Pipeline2D:
             self.res += [(self.mu, self.P)]
 
             # Prediction
+            # print(f"x,y: {xo, yo} mu: {self.mu}")
             mu2 = self.mu
             P2 = self.P
             res2 = []
@@ -208,11 +233,6 @@ class Pipeline2D:
             x_estimate = [mu[0] for mu, _ in self.res]
             y_estimate = [mu[1] for mu, _ in self.res]
 
-            # Would be a good idea to add the uncertainty of the estimate?
-            # x_uncertainty = [2 * np.sqrt(P[0, 0]) for _, P in res]
-            # y_uncertainty = [2 * np.sqrt(P[1, 1]) for _, P in res]
-            # z_uncertainty = [2 * np.sqrt(P[2, 2]) for _, P in res]
-
             x_pred = [mu2[0] for mu2, _ in res2]
             y_pred = [mu2[1] for mu2, _ in res2]
             
@@ -221,20 +241,23 @@ class Pipeline2D:
                 cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 1,( 0, 0, 255))
 
 
-            # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
-            x = x_estimate[np.argmin(np.abs(np.array(y_estimate) - TABLE_HEIGHT))]
-            print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
             
-            cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
-
-            cv.imshow("video", canvas)
-
-            # Push to result queue every SAMPLE_TIME seconds
-            if time.time() - last_time_sampled > SAMPLE_TIME:
+            
+            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.2:
+                # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
+                x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
+                print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
                 last_time_sampled = time.time()
                 self.result_queue.put_coord((x, TABLE_HEIGHT))
+                
+                if x < CUP_RIGHT_X and x > CUP_LEFT_X:
+                    self.last_prediction = x
 
-    
+                cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
+            if self.last_prediction:
+                cv.circle(canvas, (int(self.last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
+            cv.imshow("video", canvas)
+
 
 
 

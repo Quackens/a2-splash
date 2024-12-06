@@ -41,6 +41,9 @@ class CoordQueue2D:
 
     def get_length(self):
         return self.frames.qsize()
+    
+    def reset_queue(self):
+        self.frames = Queue()
 
 
 # class FrameQueue:
