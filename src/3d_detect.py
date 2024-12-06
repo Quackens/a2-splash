@@ -127,15 +127,15 @@ with dai.Device(pipeline) as device:
 
         inDepth = depthQueue.get() # Blocking call, will wait until a new data has arrived
 
-        # depthFrame = inDepth.getFrame() # depthFrame values are in millimeters
+        depthFrame = inDepth.getFrame() # depthFrame values are in millimeters
 
-        # depth_downscaled = depthFrame[::4]
-        # if np.all(depth_downscaled == 0):
-        #     min_depth = 0  # Set a default minimum depth value when all elements are zero
-        # else:
-        #     min_depth = np.percentile(depth_downscaled[depth_downscaled != 0], 1)
-        # max_depth = np.percentile(depth_downscaled, 99)
-        # depthFrameColor = np.interp(depthFrame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
+        depth_downscaled = depthFrame[::4]
+        if np.all(depth_downscaled == 0):
+            min_depth = 0  # Set a default minimum depth value when all elements are zero
+        else:
+            min_depth = np.percentile(depth_downscaled[depth_downscaled != 0], 1)
+        max_depth = np.percentile(depth_downscaled, 99)
+        depthFrameColor = np.interp(depthFrame, (min_depth, max_depth), (0, 255)).astype(np.uint8)
         
         canvas = np.zeros((1080,1920,3), dtype=np.uint8)
         cv2.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
@@ -145,22 +145,27 @@ with dai.Device(pipeline) as device:
         # print(spatialData)
         # print(fps)
         for depthData in spatialData:
-            # roi = depthData.config.roi
-            # roi = roi.denormalize(width=depthFrameColor.shape[1], height=depthFrameColor.shape[0])
+            roi = depthData.config.roi
+            roi = roi.denormalize(width=depthFrameColor.shape[1], height=depthFrameColor.shape[0])
 
             #constant ball detection update
-            if coords != None:
-                topLeft = dai.Point2f(abs(xo-50)/frame.shape[1], abs(yo-20)/frame.shape[0])
-                if (xo >= 1910):
-                    xo = 1910
-                if (yo >= 1060):
-                    yo = 1060
-                bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+20)/frame.shape[0])
+            # if coords != None:
+            #     topLeft = dai.Point2f(abs(xo-50)/frame.shape[1], abs(yo-20)/frame.shape[0])
+            #     if (xo >= 1910):
+            #         xo = 1910
+            #     if (yo >= 1060):
+            #         yo = 1060
+            #     bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+20)/frame.shape[0])
 
                 # topLeft = dai.Point2f(0.8, 0.3)
                 # bottomRight = dai.Point2f(0.9, 0.7)
-                newConfig = True
-                cv2.rectangle(canvas, (int(topLeft.x*1920), int(topLeft.y*1080)), (int(bottomRight.x*1920), int(bottomRight.y*1080)), color, 1)
+                # newConfig = True
+                # cv2.rectangle(canvas, (int(topLeft.x*1920), int(topLeft.y*1080)), (int(bottomRight.x*1920), int(bottomRight.y*1080)), color, 1)
+
+            topLeft = dai.Point2f(0.8, 0.3)
+            bottomRight = dai.Point2f(0.85, 0.5)
+            cv2.rectangle(canvas, (int(topLeft.x*1920), int(topLeft.y*1080)), (int(bottomRight.x*1920), int(bottomRight.y*1080)), color, 1)
+            newConfig = True
 
             if newConfig:
                 config.roi = dai.Rect(topLeft, bottomRight)
@@ -169,17 +174,17 @@ with dai.Device(pipeline) as device:
                 spatialCalcConfigInQueue.send(cfg)
                 newConfig = False
 
-            # xmin = int(roi.topLeft().x)
-            # ymin = int(roi.topLeft().y)
-            # xmax = int(roi.bottomRight().x)
-            # ymax = int(roi.bottomRight().y)
+            xmin = int(roi.topLeft().x)
+            ymin = int(roi.topLeft().y)
+            xmax = int(roi.bottomRight().x)
+            ymax = int(roi.bottomRight().y)
 
             fontType = cv2.FONT_HERSHEY_TRIPLEX
             # print("------------------------------new frame----------------")
             # print("x: "+str(int(depthData.spatialCoordinates.x))+"y: "+str(int(depthData.spatialCoordinates.y))+"z: "+str(int(depthData.spatialCoordinates.z)))
             newCoord = None
             if (int(depthData.spatialCoordinates.z)) != 0:
-                # cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
+                cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
                 # cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
                 # cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
                 # cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
@@ -189,9 +194,9 @@ with dai.Device(pipeline) as device:
                 coordList.append(newCoord)
                 if coordList[-1] and coordList[-1][-1] < 3000:
                     print(list(map(int, coordList[-1])))
-        cv2.imshow("video", canvas)
+        # cv2.imshow("video", canvas)
         # cv2.putText(depthFrameColor, "FPS: {:.2f}".format(fps), (2, depthFrameColor.shape[0] - 4), cv2.FONT_HERSHEY_TRIPLEX, 0.6, color)
-        # cv2.imshow("depth", depthFrameColor)
+        cv2.imshow("depth", depthFrameColor)
         key = cv2.waitKey(1)
         if key == ord('q'):
             break

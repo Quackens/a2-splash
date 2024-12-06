@@ -27,9 +27,9 @@ def detect_frame(frame):
     # # Centroid (x, y)
     #     cx = int(moments["m10"] / moments["m00"])  # x-coordinate
     #     cy = int(moments["m01"] / moments["m00"])  # y-coordinate
-    #     # cv2.circle(mask, (cx, cy), 20, (255, 0, 255), 1)
+    #     cv2.circle(mask, (cx, cy), 20, (255, 0, 255), 1)
 
-    # # cv2.imshow("orange", mask)
+    # cv2.imshow("orange", mask)
     # return cx, cy
 
 
@@ -55,7 +55,43 @@ def detect_frame(frame):
             return center
         
 
+fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
+def detect_frame_2(frame):
+    # print(frame)
+    # orangeLower = (6, 150, 200)
+    # orangeUpper = (25, 255, 255)
+    orangeLower = (3, 150, 150)
+    orangeUpper = (30, 255, 255)
 
+
+    blurred = cv2.GaussianBlur(frame, (11, 11), 0)
+    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+    # construct a mask for the color "green", then perform
+    # a series of dilations and erosions to remove any small
+    # blobs left in the mask
+    mask = cv2.inRange(hsv, orangeLower, orangeUpper)
+    mask = cv2.erode(mask, None, iterations=2)
+    mask = cv2.dilate(mask, None, iterations=2)
+
+    # Combine with background subtraction
+    fgmask = fgbg.apply(frame)
+
+    mask = cv2.bitwise_and(mask, mask, mask=fgmask)
+
+    # Trying with moments
+
+    cx, cy = None, None
+    moments = cv2.moments(mask)
+    if moments["m00"] != 0:
+    # Centroid (x, y)
+        cx = int(moments["m10"] / moments["m00"])  # x-coordinate
+        cy = int(moments["m01"] / moments["m00"])  # y-coordinate
+        cv2.circle(mask, (cx, cy), 20, (255, 0, 255), 1)
+
+    cv2.imshow("orange", mask)
+    if cx is None:
+        return None
+    return cx, cy
 
 def click_event(event, x, y, flags, params): 
     global frame

@@ -14,3 +14,4 @@ predict/
 coords
 datalist.json
 get_video.py
+*.avi
