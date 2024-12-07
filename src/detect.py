@@ -64,8 +64,8 @@ def detect_frame_2(frame):
     orangeUpper = (30, 255, 255)
 
 
-    blurred = cv2.GaussianBlur(frame, (11, 11), 0)
-    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)
+    # blurred = cv2.GaussianBlur(frame, (11, 11), 0)
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     # construct a mask for the color "green", then perform
     # a series of dilations and erosions to remove any small
     # blobs left in the mask
@@ -88,7 +88,7 @@ def detect_frame_2(frame):
         cy = int(moments["m01"] / moments["m00"])  # y-coordinate
         cv2.circle(mask, (cx, cy), 20, (255, 0, 255), 1)
 
-    cv2.imshow("orange", mask)
+    # cv2.imshow("orange", mask)
     if cx is None:
         return None
     return cx, cy
