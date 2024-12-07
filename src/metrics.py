@@ -3,6 +3,7 @@ import matplotlib.patches as patches
 import matplotlib.path as mplPath
 import matplotlib.animation as animation
 import numpy as np
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 class RealTimePlotter:
     def __init__(self):
@@ -57,12 +58,24 @@ class RealTimePlotter:
             zorder=3     # Ensure square is drawn above grid lines
         )
 
+        self.circle = patches.Circle(
+            (0, 0), # Centered at 0, 0
+            radius=4.6,  # radius of 4.6cm --> diameter = 9.2cm == 92mm
+            facecolor='blue',  # Fill color
+            alpha=0.3,   # Transparency (0.0 to 1.0)
+            edgecolor='blue',  # Border color
+            linewidth=2,  # Line thickness
+            zorder=4     # Ensure square is drawn above grid lines
+        )
+
         # Add the square to the plot
         self.fig.gca().add_patch(self.square)
+        self.fig.gca().add_patch(self.circle)
 
-        # Create a Path object for the square to check point containment
+        # Create a Path object for the square & circle to check point containment
         self.square_vertices = [(-10, -10), (-10, 10), (10, 10), (10, -10)]
         self.square_path = mplPath.Path(self.square_vertices)
+        self.circle_path = mplPath.Path.circle(radius=4.6)
 
         # Scatter plot for points
         self.scatter = plt.scatter([], [], c=[], cmap='coolwarm')
@@ -92,14 +105,19 @@ class RealTimePlotter:
             return
         
         # Separate points by location
+        splash_xs = []
+        splash_ys = []
         in_xs = []
         in_ys = []
         out_xs = []
         out_ys = []
         
         for point in self.points:
+            if self.circle_path.contains_point(point):
+                splash_xs.append(point[0])
+                splash_ys.append(point[1])    
             # Color points based on location
-            if self.square_path.contains_point(point):
+            elif self.square_path.contains_point(point):
                 in_xs.append(point[0])
                 in_ys.append(point[1])
             else:
@@ -108,7 +126,7 @@ class RealTimePlotter:
         
         # Create new scatter plot
         # self.scatter = self.ax.scatter(x_coords, y_coords, c=colors, cmap='coolwarm', edgecolors='none')
-
+        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', marker='', zorder=4)
         # in points
         self.scatter = plt.scatter(in_xs, in_ys, c='green', marker='o', zorder=4)
         # out points
@@ -129,10 +147,6 @@ class RealTimePlotter:
         if event.inaxes:
             self.add_point(round(event.xdata, 2), round(event.ydata, 2))
 
-
-    
-    # Show the plot
-    plt.show()
 
 
 # Example usage
