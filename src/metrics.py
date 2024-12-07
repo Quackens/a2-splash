@@ -126,11 +126,11 @@ class RealTimePlotter:
         
         # Create new scatter plot
         # self.scatter = self.ax.scatter(x_coords, y_coords, c=colors, cmap='coolwarm', edgecolors='none')
-        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', marker='', zorder=4)
+        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', s=200, marker='*', edgecolors='white', linewidths=0.75, zorder=4)
         # in points
-        self.scatter = plt.scatter(in_xs, in_ys, c='green', marker='o', zorder=4)
+        self.scatter = plt.scatter(in_xs, in_ys, c='green', s=100, marker='o', edgecolors='black', zorder=4)
         # out points
-        self.scatter = plt.scatter(out_xs, out_ys, c='red', marker='x', zorder=4)
+        self.scatter = plt.scatter(out_xs, out_ys, c='red', s=100, marker='X', edgecolors='black', zorder=4)
         
         # Redraw
         self.fig.canvas.draw()
@@ -147,8 +147,5 @@ class RealTimePlotter:
         if event.inaxes:
             self.add_point(round(event.xdata, 2), round(event.ydata, 2))
 
-
-
-# Example usage
 plotter = RealTimePlotter()
 plotter.start()
