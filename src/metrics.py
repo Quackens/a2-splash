@@ -4,6 +4,8 @@ import matplotlib.path as mplPath
 import matplotlib.animation as animation
 import numpy as np
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import matplotlib as mpl
+mpl.rcParams['font.family'] = 'DejaVu Serif'
 
 class RealTimePlotter:
     def __init__(self):
@@ -83,6 +85,12 @@ class RealTimePlotter:
         # enable plotting points on mouse click
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 
+        # # splash emoji setup
+        # # reading the image
+        # self.image = plt.imread('splash.png')
+        
+        # # OffsetBox
+        # self.image_box = OffsetImage(self.image, zoom=0.1)
 
     def add_point(self, x, y):
         """
@@ -126,7 +134,7 @@ class RealTimePlotter:
         
         # Create new scatter plot
         # self.scatter = self.ax.scatter(x_coords, y_coords, c=colors, cmap='coolwarm', edgecolors='none')
-        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', marker='', zorder=4)
+        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', marker='$\U0001F4A7$', zorder=4)
         # in points
         self.scatter = plt.scatter(in_xs, in_ys, c='green', marker='o', zorder=4)
         # out points
