@@ -6,18 +6,166 @@ import numpy as np
 import time
 import gcode.serial_comms_gcode as serial_comms_gcode
 import serial
+from queue_utils import CoordQueue2D, SignalStart
+from pipeline_2d import Pipeline2D_CAM2
 
 GRAVITY = 8600
 
 # In pixels
-HEIGHT = 595
-LEFT_BOUND = 572
-RIGHT_BOUND = 724
-CENTRE = 655
+HEIGHT = 1000
+LEFT_BOUND = 69
+RIGHT_BOUND = 434
+CENTRE = 247
 
 SAMPLE_TIME = 0.1
 
-class Pipeline2D:
+
+def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: SignalStart):
+    cap = cv2.VideoCapture(0)
+    cap.set(3, 1920) # set the resolution
+    cap.set(4, 1080)
+
+
+    last_time_sampled = time.time()
+
+    while True:
+        _, frame = cap.read()
+        frame = cv2.flip(frame, 0)
+        frame = cv2.flip(frame, 1)
+
+        # Only take the middle 500 pixels slice of width
+        frame = frame[:, 710:1210]
+        
+        # Only start when the side-view camera sees the ball
+        coord = None
+        preds = None
+        if signal.get_start():
+            coord = detect_frame(frame)
+
+        if coord:
+            x, y = coord
+            # print(f"X: {x}, Y: {y}")
+            preds = pipeline.run(coord) # run one iteration of kalman
+
+        if preds is not None:
+            x_list, y_list = preds  
+
+            # for x, y in zip(x_list, y_list):
+            #     cv2.circle(frame, (int(x), int(y)), 1, (0, 255, 0), -1)
+            if time.time() - last_time_sampled > SAMPLE_TIME:
+                last_time_sampled = time.time()
+                x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
+                # print(f"X: {x}, Y: {y}")
+                output_queue.put_coord((x, HEIGHT))
+        # Debugging window
+        # cv2.imshow("frame", frame)
+        # key = cv2.waitKey(1)
+        # if key == ord('q'):
+        #     break
+
+
+'''
+if __name__ == "__main__": 
+    mode = sys.argv[1]
+    if mode == "write":
+        myvideo = cv2.VideoWriter("front2.avi", cv2.VideoWriter_fourcc('M','J','P','G'), 30, (500, 1080))
+
+    predict = Pipeline2D_CAM2()
+
+    last_coord = None
+    throw_began = False
+
+    coords = []
+    if mode == "write" or mode == "live":
+        wait_time = 1
+    else:
+        wait_time = 100
+
+    last_time_sampled = time.time()
+    start_time = time.time()
+
+    # s = serial.Serial('/dev/tty.usbmodem1101',115200)
+    # serial_comms_gcode.grbl_init(s)
+    startTime = time.monotonic()
+    fps = 0
+    counter = 0
+    while True:
+        ret, frame = cap.read()
+        frame = cv2.flip(frame, 0)
+        frame = cv2.flip(frame, 1)
+
+        cv2.setMouseCallback('frame', click_event)
+        key = cv2.waitKey(wait_time)
+        if key == ord('q'):
+            break   
+        elif key == ord('p'):
+            wait_time = 0
+        current_time = time.monotonic()
+        counter+=1
+        if (current_time - startTime) > 1 :
+            fps = counter / (current_time - startTime)
+            counter = 0
+            startTime = current_time
+        # print(fps)
+        
+
+
+        # Only take the middle 500 pixels slide of width
+        if mode == "live" or mode == "write":
+            frame = frame[:, 710:1210]
+
+        if mode == "write":
+            myvideo.write(frame)
+        else:
+            coord = detect_frame(frame)
+            # print(coord)
+
+            # Only begin prediction when the throw begins
+            if throw_began:
+                preds = predict.run(coord)
+                if coord:
+                    coords.append(coord)
+                    
+                
+                for coord in coords:
+                    cv2.circle(frame, coord, 1, (0, 0, 255), -1)
+
+                if preds is not None:
+                    x_list, y_list = preds  
+                    for x, y in zip(x_list, y_list):
+                        cv2.circle(frame, (int(x), int(y)), 1, (0, 255, 0), -1)
+
+                    # Find the x where y = TABLE_HEIGHT
+                    x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
+                    cv2.circle(frame, (int(x), HEIGHT), 5, (255, 255, 0), -1)
+                    
+                    if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.2:
+                        last_time_sampled = time.time()
+                        if x > RIGHT_BOUND:
+                            # serial_comms_gcode.gcode_goto(s, 0,-10)
+                            pass
+                        elif x < LEFT_BOUND:
+                            # serial_comms_gcode.gcode_goto(s, 0, 10)
+                            pass
+                        else:
+                            y = (CENTRE - x) / ((RIGHT_BOUND - LEFT_BOUND) / 2) * 10
+                            print(f"X: {0}, Y: {y}")
+                            # serial_comms_gcode.gcode_goto(s, 0, y)
+                        
+            else:
+                throw_began = test_throw_began(coord)
+
+            cv2.line(frame, (LEFT_BOUND, HEIGHT), (RIGHT_BOUND, HEIGHT), (0, 255, 0), 10)
+            cv2.imshow("frame", frame)
+        
+
+    cap.release()
+    cv2.destroyAllWindows()
+'''
+
+
+'''
+class Pipeline2D_CAM2:
     
     def __init__(self):
         width = 1920
@@ -138,6 +286,7 @@ class Pipeline2D:
         # cv.imshow("video", canvas)
         return x_pred, y_pred
 
+
 def click_event(event, x, y, flags, params): 
     global frame
     img = frame
@@ -164,86 +313,4 @@ if sys.argv[1] == "live" or sys.argv[1] == "write":
     cap.set(cv2.CAP_PROP_FOCUS, 0)
 else:
     cap = cv2.VideoCapture(sys.argv[1])
-
-
-
-mode = sys.argv[1]
-if mode == "write":
-    myvideo = cv2.VideoWriter("front2.avi", cv2.VideoWriter_fourcc('M','J','P','G'), 30, (500, 1080))
-
-predict = Pipeline2D()
-
-last_coord = None
-throw_began = False
-
-coords = []
-if mode == "write" or mode == "live":
-    wait_time = 1
-else:
-    wait_time = 100
-
-last_time_sampled = time.time()
-start_time = time.time()
-
-s = serial.Serial('/dev/tty.usbmodem101',115200)
-serial_comms_gcode.grbl_init(s)
-
-while True:
-    ret, frame = cap.read()
-    cv2.setMouseCallback('frame', click_event)
-    key = cv2.waitKey(wait_time)
-    if key == ord('q'):
-        break   
-    elif key == ord('p'):
-        wait_time = 0
-    
-
-    cv2.line(frame, (LEFT_BOUND, HEIGHT), (RIGHT_BOUND, HEIGHT), (0, 255, 0), 2)
-
-
-    # Only take the middle 500 pixels slide of width
-    if mode == "live" or mode == "write":
-        frame = frame[:, 710:1210]
-
-    if mode == "write":
-        myvideo.write(frame)
-    else:
-        coord = detect_frame(frame)
-        print(coord)
-
-        # Only begin prediction when the throw begins
-        if throw_began:
-            preds = predict.run(coord)
-            if coord:
-                coords.append(coord)
-                
-            
-            for coord in coords:
-                cv2.circle(frame, coord, 1, (0, 0, 255), -1)
-
-            if preds is not None:
-                x_list, y_list = preds  
-                for x, y in zip(x_list, y_list):
-                    cv2.circle(frame, (int(x), int(y)), 1, (0, 255, 0), -1)
-
-                # Find the x where y = TABLE_HEIGHT
-                x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
-                cv2.circle(frame, (int(x), HEIGHT), 5, (255, 255, 0), -1)
-                
-                if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.2:
-                    last_time_sampled = time.time()
-                    if x > RIGHT_BOUND:
-                        serial_comms_gcode.gcode_goto(s, 0,-10)
-                    elif x < LEFT_BOUND:
-                        serial_comms_gcode.gcode_goto(s, 0, 10)
-                    else:
-                        serial_comms_gcode.gcode_goto(s, 0, HEIGHT)
-                    
-        else:
-            throw_began = test_throw_began(coord)
-
-        cv2.imshow("frame", frame)
-    
-
-cap.release()
-cv2.destroyAllWindows()
+'''

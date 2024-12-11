@@ -95,7 +95,8 @@ def random_move(s):
 
 def main():
     # Open grbl serial port
-    s = serial.Serial('COM7',115200)
+    # s = serial.Serial('COM7',115200)
+    s = serial.Serial('/dev/tty.usbmodem1101',115200)
 
     # initialize grbl connection
     grbl_init(s)

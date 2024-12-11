@@ -149,23 +149,23 @@ with dai.Device(pipeline) as device:
             roi = roi.denormalize(width=depthFrameColor.shape[1], height=depthFrameColor.shape[0])
 
             #constant ball detection update
-            # if coords != None:
-            #     topLeft = dai.Point2f(abs(xo-50)/frame.shape[1], abs(yo-20)/frame.shape[0])
-            #     if (xo >= 1910):
-            #         xo = 1910
-            #     if (yo >= 1060):
-            #         yo = 1060
-            #     bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+20)/frame.shape[0])
+            if coords != None:
+                topLeft = dai.Point2f(abs(xo-50)/frame.shape[1], abs(yo-20)/frame.shape[0])
+                if (xo >= 1910):
+                    xo = 1910
+                if (yo >= 1060):
+                    yo = 1060
+                bottomRight = dai.Point2f((xo+10)/frame.shape[1], (yo+20)/frame.shape[0])
 
                 # topLeft = dai.Point2f(0.8, 0.3)
                 # bottomRight = dai.Point2f(0.9, 0.7)
-                # newConfig = True
+                newConfig = True
                 # cv2.rectangle(canvas, (int(topLeft.x*1920), int(topLeft.y*1080)), (int(bottomRight.x*1920), int(bottomRight.y*1080)), color, 1)
 
-            topLeft = dai.Point2f(0.8, 0.3)
-            bottomRight = dai.Point2f(0.85, 0.5)
-            cv2.rectangle(canvas, (int(topLeft.x*1920), int(topLeft.y*1080)), (int(bottomRight.x*1920), int(bottomRight.y*1080)), color, 1)
-            newConfig = True
+            # topLeft = dai.Point2f(0.8, 0.3)
+            # bottomRight = dai.Point2f(0.85, 0.5)
+            # cv2.rectangle(canvas, (int(topLeft.x*1920), int(topLeft.y*1080)), (int(bottomRight.x*1920), int(bottomRight.y*1080)), color, 1)
+            # newConfig = True
 
             if newConfig:
                 config.roi = dai.Rect(topLeft, bottomRight)
@@ -183,12 +183,12 @@ with dai.Device(pipeline) as device:
             # print("------------------------------new frame----------------")
             # print("x: "+str(int(depthData.spatialCoordinates.x))+"y: "+str(int(depthData.spatialCoordinates.y))+"z: "+str(int(depthData.spatialCoordinates.z)))
             newCoord = None
-            if (int(depthData.spatialCoordinates.z)) != 0:
-                cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
-                # cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
-                # cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
-                # cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
-                newCoord = coordGen(xo, yo, int(depthData.spatialCoordinates.x), int(depthData.spatialCoordinates.y), int(depthData.spatialCoordinates.z))
+            # if (int(depthData.spatialCoordinates.z)) != 0:
+            cv2.rectangle(depthFrameColor, (xmin, ymin), (xmax, ymax), color, 1)
+            # cv2.putText(depthFrameColor, f"X: {int(depthData.spatialCoordinates.x)} mm", (xmin + 10, ymin + 20), fontType, 0.5, color)
+            # cv2.putText(depthFrameColor, f"Y: {int(depthData.spatialCoordinates.y)} mm", (xmin + 10, ymin + 35), fontType, 0.5, color)
+            # cv2.putText(depthFrameColor, f"Z: {int(depthData.spatialCoordinates.z)} mm", (xmin + 10, ymin + 50), fontType, 0.5, color)
+            newCoord = coordGen(xo, yo, int(depthData.spatialCoordinates.x), int(depthData.spatialCoordinates.y), int(depthData.spatialCoordinates.z))
             if (coords != None):
                 # print(newCoord)
                 coordList.append(newCoord)
