@@ -28,6 +28,7 @@ class RealTimePlotter:
         plt.yticks(range(-20, 21, 2))
 
         # Add major grid lines
+        # plt.gca().set_facecolor('#faefb4')  # Set light yellow background color
         plt.grid(which='major', color='gray', linestyle='-', linewidth=0.5, zorder=1)
         
         # Highlight x and y axes
@@ -35,9 +36,9 @@ class RealTimePlotter:
         plt.axvline(x=0, color='k', linewidth=1.5, zorder=2)
 
         # Labeling
-        plt.title('2D Point Visualization with Green Square')
+        plt.title('Splash Metrics & Visual Feedback')
         plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
+        plt.ylabel('Z-axis')
         
         # Ensure equal aspect ratio and fixed view
         plt.axis('equal')
@@ -83,6 +84,16 @@ class RealTimePlotter:
         # enable plotting points on mouse click
         self.cid = self.fig.canvas.mpl_connect('button_press_event', self.onclick)
 
+        # Session metrics
+        self.total_shots = 0
+        self.splash_shots = 0
+        self.avg_percentage = 0.0
+        self.avg_text = f' Session Accuracy: {self.avg_percentage:.1f}% ({self.splash_shots}/{self.total_shots})'
+        self.avg_display = self.fig.text(0.02, 0.98, self.avg_text,
+            fontsize=10,
+            verticalalignment='top',
+            bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
+
 
     def add_point(self, x, y):
         """
@@ -91,7 +102,11 @@ class RealTimePlotter:
         :param y: y-coordinate
         """
         print(f"x={x}, y={y}")
-        self.points.append((x, y))
+        point = (x, y)
+        self.points.append(point)
+        self.total_shots += 1
+        if self.circle_path.contains_point(point): 
+            self.splash_shots += 1
         self.update_plot()
 
     def update_plot(self):
@@ -115,7 +130,7 @@ class RealTimePlotter:
         for point in self.points:
             if self.circle_path.contains_point(point):
                 splash_xs.append(point[0])
-                splash_ys.append(point[1])    
+                splash_ys.append(point[1])
             # Color points based on location
             elif self.square_path.contains_point(point):
                 in_xs.append(point[0])
@@ -123,14 +138,18 @@ class RealTimePlotter:
             else:
                 out_xs.append(point[0])
                 out_ys.append(point[1])
+
+        avg_percentage = (self.splash_shots / self.total_shots) * 100 if self.total_shots > 0 else 0
+        avg_text = f'Session Accuracy: {avg_percentage:.1f}% ({self.splash_shots}/{self.total_shots})'
+        self.avg_display.set_text(avg_text)
         
         # Create new scatter plot
         # self.scatter = self.ax.scatter(x_coords, y_coords, c=colors, cmap='coolwarm', edgecolors='none')
-        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', marker='', zorder=4)
+        self.scatter = plt.scatter(splash_xs, splash_ys, c='blue', s=200, marker='*', edgecolors='white', linewidths=0.75, zorder=4)
         # in points
-        self.scatter = plt.scatter(in_xs, in_ys, c='green', marker='o', zorder=4)
+        self.scatter = plt.scatter(in_xs, in_ys, c='green', s=100, marker='o', edgecolors='black', zorder=4)
         # out points
-        self.scatter = plt.scatter(out_xs, out_ys, c='red', marker='x', zorder=4)
+        self.scatter = plt.scatter(out_xs, out_ys, c='red', s=100, marker='X', edgecolors='black', zorder=4)
         
         # Redraw
         self.fig.canvas.draw()
@@ -147,8 +166,5 @@ class RealTimePlotter:
         if event.inaxes:
             self.add_point(round(event.xdata, 2), round(event.ydata, 2))
 
-
-
-# Example usage
 plotter = RealTimePlotter()
 plotter.start()
