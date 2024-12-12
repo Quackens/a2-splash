@@ -13,7 +13,8 @@ fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
 def detect_frame(frame):
 
-    orangeLower = (3, 150, 150)
+    # orangeLower = (3, 150, 150) # DAYTIME
+    orangeLower = (3, 100, 150) # NIGHTTIME
     orangeUpper = (30, 255, 255)
 
 
@@ -51,10 +52,8 @@ def detect_frame(frame):
 
 
 def detect_frame_2(frame):
-    # print(frame)
-    # orangeLower = (6, 150, 200)
-    # orangeUpper = (25, 255, 255)
-    orangeLower = (3, 150, 150)
+    # orangeLower = (3, 150, 150) # DAYTIME
+    orangeLower = (3, 100, 150) # NIGHTTIME
     orangeUpper = (30, 255, 255)
 
 
