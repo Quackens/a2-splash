@@ -311,5 +311,3 @@ class RealTimePlotter:
         plt.ion()
         plt.show()
 
-plotter = RealTimePlotter()
-plotter.show()

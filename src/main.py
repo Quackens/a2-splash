@@ -19,6 +19,7 @@ import random
 import math
 
 import gcode.serial_comms_gcode as serial_comms_gcode
+from improved_metrics import RealTimePlotter
 
 
 def serialize_loop():
@@ -156,7 +157,8 @@ if __name__ == '__main__':
     
     s = None
     grbl = False
-        
+    plotter = RealTimePlotter()
+    plotter.show()
     
 
 
