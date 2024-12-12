@@ -6,13 +6,11 @@ from detect import detect_frame
 import gcode.serial_comms_gcode as serial_comms_gcode
 
 
+TABLE_HEIGHT = 878 # Height of the table in pixels (WxH)
 
-# TODO: realign
-TABLE_HEIGHT = 852 # Height of the table in pixels (WxH)
-
-CUP_LEFT_X = 102 # Left edge of the cup in pixels (WxH)
+CUP_LEFT_X = 123 # Left edge of the cup in pixels (WxH)
 CUP_CENTRE_X = 200 # Centre of the cup in pixels (WxH)
-CUP_RIGHT_X = 270 # Right edge of the cup in pixels (WxH)
+CUP_RIGHT_X = 281 # Right edge of the cup in pixels (WxH)
 
 SAMPLE_TIME = 0.1 # seconds (to put into result queue)
 
@@ -64,11 +62,12 @@ class Pipeline2D:
 
         self.Q = sigmaM**2 * np.eye(4)   # processNoiseCov
         self.R = sigmaZ**2 * np.eye(2)   # measurementNoiseCov
-        self.listCenterX=[]
-        self.listCenterY=[]
+        # self.listCenterX=[]
+        # self.listCenterY=[]
 
         self.last_prediction = None
-
+        self.last_run = time.time()
+        self.run_count = 0
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
         # B : controlMatrix -->  B @ u : gravity
         x_pred = A @ x_esti + B @ u           
@@ -97,9 +96,13 @@ class Pipeline2D:
     def reset(self, serial):
         self.mu = np.array([0, 0, 0, 0])
         self.P = 1000 ** 2 * np.eye(4)
-        serial_comms_gcode.gcode_goto(serial, 0, 0)
+        if serial:
+            serial_comms_gcode.gcode_goto(serial, 0, 0)
         self.coord_queue.reset_queue()
         self.last_prediction = None
+        self.last_run = time.time()
+        self.run_count = 0
+        # self.result_queue.reset_queue()
 
     
     def test(self, data_list):
@@ -122,7 +125,7 @@ class Pipeline2D:
             canvas = np.zeros((1080,1920,3), dtype=np.uint8)
             cv.line(canvas, (CUP_LEFT_X, TABLE_HEIGHT), (CUP_RIGHT_X, TABLE_HEIGHT), (0, 255, 0), 2)
             cv.circle(canvas, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (255, 255, 0), -1)
-            # print(coords)
+            print(coords)
             if coords is None:
                 cv.imshow("video", canvas)
                 continue
@@ -182,32 +185,37 @@ class Pipeline2D:
         last_time_sampled = 0
         wait_time = 1
         start_time = time.time()
-        last_run = time.time()
+        self.last_run = time.time()
 
         print(f"Table Height: {TABLE_HEIGHT}")
 
         while(True):
-            key = cv.waitKey(1)
-            if key == ord('q'):
-                break
-            if key == ord('r'):
-                self.reset(serial)
-                
-            if time.time() - last_run > 2:
-                self.reset(serial)
             
+
+            if time.time() - self.last_run > 2:
+                print("RESET side cam")
+                self.reset(serial)
             # Assume there is a stream of coordinates arriving at 30 per second
             coords = self.coord_queue.get_coord()
-
+            # print(self.coord_queue.get_length())
 
             canvas = np.zeros((1080,1920,3), dtype=np.uint8)
             cv.line(canvas, (CUP_LEFT_X, TABLE_HEIGHT), (CUP_RIGHT_X, TABLE_HEIGHT), (0, 255, 0), 2)
             cv.circle(canvas, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (255, 255, 0), -1)
-            # print(coords)
+
+            # Debugging window
+            key = cv.waitKey(1)
+            if key == ord('q'):
+                break
+            if key == ord('r'):
+                print("RESET")
+                self.reset(serial)
+
+
             if coords is None:
                 cv.imshow("video", canvas)
                 continue
-            last_run = time.time()
+
             xo, yo = coords
             if xo is None and yo is None:
                 cv.imshow("video", canvas)
@@ -215,8 +223,8 @@ class Pipeline2D:
             cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
-            self.listCenterX.append(xo)
-            self.listCenterY.append(yo)
+            # self.listCenterX.append(xo)
+            # self.listCenterY.append(yo)
 
             self.res += [(self.mu, self.P)]
 
@@ -238,26 +246,27 @@ class Pipeline2D:
             
             # Find the x where y = TABLE_HEIGHT
             for n in range(len(x_pred)): # x y predicted
-                cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 1,( 0, 0, 255))
+                cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 5,( 0, 0, 255))
 
 
             
             
-            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.2:
+            if self.run_count < 6 and time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.2:
                 # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
                 x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
-                print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
+                # print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
                 last_time_sampled = time.time()
                 self.result_queue.put_coord((x, TABLE_HEIGHT))
-                
+                self.run_count += 1
                 if x < CUP_RIGHT_X and x > CUP_LEFT_X:
                     self.last_prediction = x
 
                 cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
             if self.last_prediction:
                 cv.circle(canvas, (int(self.last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
+            
             cv.imshow("video", canvas)
-
+            
 
 
 
@@ -304,8 +313,11 @@ class Pipeline2D_CAM2:
 
         self.Q = sigmaM**2 * np.eye(4)   # processNoiseCov
         self.R = sigmaZ**2 * np.eye(2)   # measurementNoiseCov
-        self.listCenterX=[]
-        self.listCenterY=[]
+
+
+    def reset(self):
+        self.mu = np.array([0, 0, 0, 0])
+        self.P = 1000 ** 2 * np.eye(4)
 
 
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
@@ -346,7 +358,7 @@ class Pipeline2D_CAM2:
         if coords is None:
             # cv.imshow("video", canvas)
             return
-        last_run = time.time()
+
         xo, yo = coords
         if xo is None and yo is None:
             # cv.imshow("video", canvas)
@@ -355,8 +367,8 @@ class Pipeline2D_CAM2:
         # cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 
         self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
-        self.listCenterX.append(xo)
-        self.listCenterY.append(yo)
+        # self.listCenterX.append(xo)
+        # self.listCenterY.append(yo)
 
         self.res += [(self.mu, self.P)]
 

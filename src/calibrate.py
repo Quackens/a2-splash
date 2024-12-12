@@ -1,6 +1,8 @@
 import cv2
 import depthai as dai
 import sys
+import gcode.serial_comms_gcode as serial_comms_gcode
+import serial
 
 # Usage: python3 src/calibrate.py -front
 #        python3 src/calibrate.py -side
@@ -18,6 +20,7 @@ def click_event(event, x, y, flags, params):
         print(f"X: {x}, Y: {y}")
               
 
+
 # Output video
 write_video = len(sys.argv) > 2 and sys.argv[2] == '-o'
 if write_video:
@@ -26,6 +29,8 @@ if write_video:
     myvideo=cv2.VideoWriter("../out/color_tune_60fps.avi", cv2.VideoWriter_fourcc('M','J','P','G'), 60, (int(width),int(height)))
 
 if sys.argv[1] == "-side":
+    s = serial.Serial('/dev/tty.usbmodem2101',115200)
+    serial_comms_gcode.grbl_init(s)
     # Create pipeline
     pipeline = dai.Pipeline()
 
@@ -64,10 +69,17 @@ if sys.argv[1] == "-side":
                 myvideo.write(frame)
             else:
                 cv2.imshow("video", frame)
-            
-            if cv2.waitKey(1) == ord('q'):
+            key = cv2.waitKey(1)
+            if key == ord('q'):
+                s.close()
                 break
+            elif key == ord('l'):
+                serial_comms_gcode.gcode_goto(s, 10, 0)
+            elif key == ord('k'):
+                serial_comms_gcode.gcode_goto(s, -10, 0)
+            
             cv2.setMouseCallback('video', click_event)
+            
 else:
     from cam2 import HEIGHT, CENTRE
     cap = cv2.VideoCapture(0)
@@ -83,5 +95,6 @@ else:
         else:
             cv2.imshow("video", frame)
         if cv2.waitKey(1) == ord('q'):
+            s.close()
             break
         cv2.setMouseCallback('video', click_event)

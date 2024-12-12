@@ -4,8 +4,7 @@ from detect import detect_frame_2 as detect_frame
 import sys
 import numpy as np
 import time
-import gcode.serial_comms_gcode as serial_comms_gcode
-import serial
+
 from queue_utils import CoordQueue2D, SignalStart
 from pipeline_2d import Pipeline2D_CAM2
 
@@ -13,8 +12,8 @@ GRAVITY = 8600
 
 # In pixels
 HEIGHT = 1000
-LEFT_BOUND = 69
-RIGHT_BOUND = 434
+LEFT_BOUND = 74
+RIGHT_BOUND = 428
 CENTRE = 247
 
 SAMPLE_TIME = 0.1
@@ -27,12 +26,25 @@ def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: Sig
 
 
     last_time_sampled = time.time()
+    last_run = time.time()
+    run_count = 0
 
     while True:
         _, frame = cap.read()
         frame = cv2.flip(frame, 0)
         frame = cv2.flip(frame, 1)
 
+        if time.time() - last_run > 2:
+            print("RESET front cam")
+            # output_queue.reset_queue()
+            pipeline.reset()
+            last_run = time.time()
+            signal.set_start(False)
+            run_count = 0
+            # output_queue.reset_queue()
+
+        if frame is None:
+            break
         # Only take the middle 500 pixels slice of width
         frame = frame[:, 710:1210]
         
@@ -40,9 +52,11 @@ def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: Sig
         coord = None
         preds = None
         if signal.get_start():
+            # print("Front cam Starting")
             coord = detect_frame(frame)
 
         if coord:
+            last_run = time.time()
             x, y = coord
             # print(f"X: {x}, Y: {y}")
             preds = pipeline.run(coord) # run one iteration of kalman
@@ -50,13 +64,18 @@ def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: Sig
         if preds is not None:
             x_list, y_list = preds  
 
-            # for x, y in zip(x_list, y_list):
-            #     cv2.circle(frame, (int(x), int(y)), 1, (0, 255, 0), -1)
-            if time.time() - last_time_sampled > SAMPLE_TIME:
+            for x, y in zip(x_list, y_list):
+                cv2.circle(frame, (int(x), int(y)), 3, (0, 255, 0), -1)
+
+            cv2.circle(frame, (int(x), HEIGHT), 5, (255, 255, 0), -1)
+            if run_count < 6 and time.time() - last_time_sampled > SAMPLE_TIME:
                 last_time_sampled = time.time()
                 x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
-                # print(f"X: {x}, Y: {y}")
+                print(f"cam2: X: {x}, Y: {y}")
                 output_queue.put_coord((x, HEIGHT))
+                run_count += 1
+
+        cv2.line(frame, (LEFT_BOUND, HEIGHT), (RIGHT_BOUND, HEIGHT), (0, 255, 0), 10)
         # Debugging window
         # cv2.imshow("frame", frame)
         # key = cv2.waitKey(1)
