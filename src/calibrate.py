@@ -52,7 +52,7 @@ if sys.argv[1] == "-side":
     # Linking
     camRgb.video.link(xoutVideo.input)
 
-    from pipeline_2d import TABLE_HEIGHT, CUP_CENTRE_X
+    from pipeline_2d import TABLE_HEIGHT, CUP_CENTRE_X, CUP_LEFT_X, CUP_RIGHT_X
 
     # Connect to device and start pipeline
     with dai.Device(pipeline) as device:
@@ -65,6 +65,10 @@ if sys.argv[1] == "-side":
             # Get BGR frame from NV12 encoded video frame to show with opencv
             # Visualizing the frame on slower hosts might have overhead
             cv2.circle(frame, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (0, 0, 255), -1)
+            cv2.circle(frame, (CUP_LEFT_X, TABLE_HEIGHT), 5, (0, 0, 255), -1)
+            cv2.circle(frame, (CUP_RIGHT_X, TABLE_HEIGHT), 5, (0, 0, 255), -1)
+
+            cv2.line(frame, (0, 895), (1920, 895), (0, 255, 0), 2)
             if write_video:
                 myvideo.write(frame)
             else:
@@ -83,20 +87,20 @@ if sys.argv[1] == "-side":
             cv2.setMouseCallback('video', click_event)
             
 else:
-    from cam2 import HEIGHT, CENTRE
+    from cam2 import HEIGHT, CENTRE, LEFT_BOUND, RIGHT_BOUND
     cap = cv2.VideoCapture(0)
     while True:
         _, frame = cap.read()
         frame = cv2.flip(frame, 0)
         frame = cv2.flip(frame, 1)
         frame = frame[:, 710:1210]
-        
+        cv2.line(frame, (0, 768), (500, 768), (0, 255, 0), 2)
         cv2.circle(frame, (CENTRE, HEIGHT), 5, (0, 0, 255), -1)
+        cv2.line(frame, (LEFT_BOUND, HEIGHT), (RIGHT_BOUND, HEIGHT), (0, 255, 0), 2)
         if write_video:
             myvideo.write(frame)
         else:
             cv2.imshow("video", frame)
         if cv2.waitKey(1) == ord('q'):
-            s.close()
             break
         cv2.setMouseCallback('video', click_event)

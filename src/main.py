@@ -69,29 +69,51 @@ def serialize_loop():
 
         
         # Normalize the x coordinate
-        if x > SIDE_RIGHT_BOUND:
+        if SIDE_RIGHT_BOUND < x < SIDE_RIGHT_BOUND+50:
             gantry_x = 10
-        elif x < SIDE_LEFT_BOUND:
+            # gantry_x = 5
+
+
+        elif SIDE_LEFT_BOUND-50 < x < SIDE_LEFT_BOUND:
             gantry_x = -10
-        else:
+            # gantry_x = -5
+
+        elif SIDE_LEFT_BOUND <= x <=SIDE_RIGHT_BOUND:
             # gantry_x = (x - SIDE_CENTRE) / 7.5
 
             # TODO: fix
-            gantry_x = (x - SIDE_CENTRE) / ((SIDE_RIGHT_BOUND - SIDE_LEFT_BOUND) / 2) * 10
+            # gantry_x = (x - SIDE_CENTRE) / ((SIDE_RIGHT_BOUND - SIDE_LEFT_BOUND) / 2) * 10
+            if x < SIDE_CENTRE:
+                gantry_x = ((x - SIDE_CENTRE) / (SIDE_CENTRE - SIDE_LEFT_BOUND)) * 10
+            else:
+                gantry_x = ((x - SIDE_CENTRE) / (SIDE_RIGHT_BOUND - SIDE_CENTRE)) * 10
+            
             if gantry_x < -10: gantry_x = -10
             if gantry_x > 10: gantry_x = 10
-        # Normalize the y coordinate    
-        if y > FRONT_RIGHT_BOUND:
-            gantry_y = -10
-        elif y < FRONT_LEFT_BOUND:
-            gantry_y = 10
         else:
+            gantry_x = prev_x
+        # Normalize the y coordinate    
+        if FRONT_RIGHT_BOUND < y < FRONT_RIGHT_BOUND+50:
+            gantry_y = -10
+            # gantry_y = -5
+        elif FRONT_LEFT_BOUND-50 < y < FRONT_LEFT_BOUND:
+            gantry_y = 10
+            # gantry_y = 5
+        elif FRONT_LEFT_BOUND <= y <= FRONT_RIGHT_BOUND:
+            
             # TODO: fix
-            gantry_y = (FRONT_CENTRE - y) / ((FRONT_RIGHT_BOUND - FRONT_LEFT_BOUND) / 2) * 10
+            # gantry_y = (FRONT_CENTRE - y) / ((FRONT_RIGHT_BOUND - FRONT_LEFT_BOUND) / 2) * 10
+            if y < FRONT_CENTRE:
+                gantry_y = ((FRONT_CENTRE - y) / (FRONT_CENTRE - FRONT_LEFT_BOUND)) * 10
+            else:
+                gantry_y = ((FRONT_CENTRE - y) / (FRONT_RIGHT_BOUND - FRONT_CENTRE)) * 10
+
             if gantry_y < -10: gantry_y = -10
             if gantry_y > 10: gantry_y = 10
-        prev_x = x
-        prev_y = y
+        else:
+            gantry_y = prev_y
+        prev_x = gantry_x
+        prev_y = gantry_y
         print(f"Send as grbl: {gantry_x} {gantry_y}")
         if grbl:
             serial_comms_gcode.gcode_goto(s, gantry_x, gantry_y)

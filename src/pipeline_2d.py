@@ -8,15 +8,18 @@ import gcode.serial_comms_gcode as serial_comms_gcode
 from improved_metrics import RealTimePlotter
 from main import plotter
 
-TABLE_HEIGHT = 874 # Height of the table in pixels (WxH)
+TABLE_HEIGHT = 845 # Height of the table in pixels (WxH)
 
-CUP_LEFT_X = 120 # Left edge of the cup in pixels (WxH)
-CUP_CENTRE_X = 200 # Centre of the cup in pixels (WxH)
-CUP_RIGHT_X = 281 # Right edge of the cup in pixels (WxH)
+CUP_LEFT_X = 90 # Left edge of the cup in pixels (WxH)
+CUP_CENTRE_X = 185 # Centre of the cup in pixels (WxH)
+CUP_RIGHT_X = 275 # Right edge of the cup in pixels (WxH)
 
-SAMPLE_TIME = 0.1 # seconds (to put into result queue)
+# SAMPLE_TIME = 0.1 # seconds (to put into result queue)
 #Sample @ time  0.2, 0.4, 0.5, 0.55, 0.60, 0.65, 0.67
-SAMPLE_TIMES = [0.2, 0.2, 0.1, 0.05, 0.05, 0.05, 0.02] # add to 0.6 TODO
+# SAMPLE_TIMES = [0.25, 0.25, 0.1, 0.1] # add to 0.6 TODO
+# FIRST ONE DUMMY
+SAMPLE_TIMES = [0, 0.2, 0.2, 0.15, 0.1] # add to 0.6 TODO
+# SAMPLE_TIMES = [0.4, 0.1, 0.1, 0.1] # add to 0.6 TODO
 GRAVITY = 8600
 # GRAVITY = 9400
 
@@ -76,6 +79,7 @@ class Pipeline2D:
         self.start_time = time.time()
         self.observed_x = []
         self.observed_y = []
+        self.stop_run = False
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
         # B : controlMatrix -->  B @ u : gravity
         x_pred = A @ x_esti + B @ u           
@@ -124,6 +128,7 @@ class Pipeline2D:
             print(f"Actual Side: {gantry_x}")
         self.observed_x = []
         self.observed_y = []
+        self.stop_run = False
 
     def run(self, serial):
         
@@ -183,6 +188,9 @@ class Pipeline2D:
                 # if y has been supplied by the front camera already, visualize
                 # else, visualization is done by the front camera pipeline.
                 plotter.update_saved() 
+                
+            if ((xo < 400) and (yo > TABLE_HEIGHT)):
+                self.stop_run = True
 
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
             # self.listCenterX.append(xo)
@@ -200,8 +208,8 @@ class Pipeline2D:
                 mu2, P2, _ = self.kalman(mu2, P2, self.A, self.Q, self.B, self.a, None, self.H, self.R)
                 res2 += [(mu2, P2)]
 
-            x_estimate = [mu[0] for mu, _ in self.res]
-            y_estimate = [mu[1] for mu, _ in self.res]
+            # x_estimate = [mu[0] for mu, _ in self.res]
+            # y_estimate = [mu[1] for mu, _ in self.res]
 
             x_pred = [mu2[0] for mu2, _ in res2]
             y_pred = [mu2[1] for mu2, _ in res2]
@@ -211,19 +219,24 @@ class Pipeline2D:
                 cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 5,( 0, 0, 255))
             
             # TODO: make sure run count is changed higher if changing to 50ms samples at the 
-            if self.run_count < 7 and time.time() - last_time_sampled > SAMPLE_TIMES[self.run_count] and time.time() - self.start_time > 0.2:
+            if not self.stop_run and self.run_count < len(SAMPLE_TIMES) and time.time() - \
+                last_time_sampled > SAMPLE_TIMES[self.run_count] and time.time() - self.start_time > 0.2:
                 # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
-                # x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
+                if self.run_count == 0:
+                    last_time_sampled = time.time()
+                    self.run_count += 1
+                    continue
+                x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
                 
                 # x0 and x1 are the x values corresponding to the two closest y values to the TABLE_HEIGHT
-                i0, i1 = np.argsort(np.abs(np.array(y_pred) - TABLE_HEIGHT))[:2]
-                y0, y1 = y_pred[i0], y_pred[i1]
-                x0, x1 = x_pred[i0], x_pred[i1]
+                # i0, i1 = np.argsort(np.abs(np.array(y_pred) - TABLE_HEIGHT))[:2]
+                # y0, y1 = y_pred[i0], y_pred[i1]
+                # x0, x1 = x_pred[i0], x_pred[i1]
                 # perform linear interpolation to find x at the TABLE_HEIGHT
-                if y0 != y1:
-                    x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
-                else:
-                    x = x0
+                # if y0 != y1:
+                #     x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
+                # else:
+                #     x = x0
 
                 # print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
                 last_time_sampled = time.time()
