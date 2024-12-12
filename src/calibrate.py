@@ -76,6 +76,8 @@ if sys.argv[1] == "-side":
             elif key == ord('l'):
                 serial_comms_gcode.gcode_goto(s, 10, 0)
             elif key == ord('k'):
+                serial_comms_gcode.gcode_goto(s, 0, 0)
+            elif key == ord('j'):
                 serial_comms_gcode.gcode_goto(s, -10, 0)
             
             cv2.setMouseCallback('video', click_event)

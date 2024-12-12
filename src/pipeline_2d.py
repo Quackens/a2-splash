@@ -13,7 +13,8 @@ CUP_CENTRE_X = 200 # Centre of the cup in pixels (WxH)
 CUP_RIGHT_X = 281 # Right edge of the cup in pixels (WxH)
 
 SAMPLE_TIME = 0.1 # seconds (to put into result queue)
-
+#Sample @ time  0.2, 0.4, 0.5, 0.55, 0.60, 0.65, 0.67
+SAMPLE_TIMES = [0.2, 0.2, 0.1, 0.05, 0.05, 0.05, 0.02] # add to 0.6 TODO
 GRAVITY = 8600
 # GRAVITY = 9400
 
@@ -122,82 +123,6 @@ class Pipeline2D:
         self.observed_x = []
         self.observed_y = []
 
-    
-    def test(self, data_list):
-        last_prediction = None
-        last_time_sampled = 0
-        wait_time = 1
-        # start_time = time.time()
-        # TABLE_HEIGHT = data_list[-1][1]
-        print(f"Table Height: {TABLE_HEIGHT}")
-        print(f"Last coord: {data_list[-1]}")
-        for coords in data_list:
-            key = cv.waitKey(wait_time)
-            if key == ord('q'):
-                break
-            elif key == ord('p'):
-                # Pause
-                wait_time = 0
-            elif key == ord('s'):
-                wait_time = 100
-            canvas = np.zeros((1080,1920,3), dtype=np.uint8)
-            cv.line(canvas, (CUP_LEFT_X, TABLE_HEIGHT), (CUP_RIGHT_X, TABLE_HEIGHT), (0, 255, 0), 2)
-            cv.circle(canvas, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (255, 255, 0), -1)
-            print(coords)
-            if coords is None:
-                cv.imshow("video", canvas)
-                continue
-            
-            xo, yo = coords
-            if xo is None and yo is None:
-                cv.imshow("video", canvas)
-                continue
-            cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
-
-            self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
-            self.listCenterX.append(xo)
-            self.listCenterY.append(yo)
-
-            self.res += [(self.mu, self.P)]
-
-            # Prediction
-            # print(f"x,y: {xo, yo} mu: {self.mu}")
-            mu2 = self.mu
-            P2 = self.P
-            res2 = []
-
-            for _ in range(240):
-                mu2, P2, _ = self.kalman(mu2, P2, self.A, self.Q, self.B, self.a, None, self.H, self.R)
-                res2 += [(mu2, P2)]
-
-            x_estimate = [mu[0] for mu, _ in self.res]
-            y_estimate = [mu[1] for mu, _ in self.res]
-
-            x_pred = [mu2[0] for mu2, _ in res2]
-            y_pred = [mu2[1] for mu2, _ in res2]
-            
-            # Find the x where y = TABLE_HEIGHT
-            for n in range(len(x_pred)): # x y predicted
-                cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 1,( 0, 0, 255))
-
-
-            
-            
-            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - self.start_time > 0.4:
-                # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
-                x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
-                # print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
-                last_time_sampled = time.time()
-                self.result_queue.put_coord((x, TABLE_HEIGHT))
-                print(f"Side cam: {x}")
-                if x < CUP_RIGHT_X and x > CUP_LEFT_X:
-                    last_prediction = x
-                
-                cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
-            if last_prediction:
-                cv.circle(canvas, (int(last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
-            cv.imshow("video", canvas)
-
     def run(self, serial):
         
         last_time_sampled = 0
@@ -267,13 +192,22 @@ class Pipeline2D:
             # Find the x where y = TABLE_HEIGHT
             for n in range(len(x_pred)): # x y predicted
                 cv.circle(canvas,(int(x_pred[n]),int(y_pred[n])), 5,( 0, 0, 255))
-
-
             
-            
-            if self.run_count < 6 and time.time() - last_time_sampled > SAMPLE_TIME and time.time() - self.start_time > 0.2:
+            # TODO: make sure run count is changed higher if changing to 50ms samples at the 
+            if self.run_count < 7 and time.time() - last_time_sampled > SAMPLE_TIMES[self.run_count] and time.time() - self.start_time > 0.2:
                 # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
-                x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
+                # x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
+                
+                # x0 and x1 are the x values corresponding to the two closest y values to the TABLE_HEIGHT
+                i0, i1 = np.argsort(np.abs(np.array(y_pred) - TABLE_HEIGHT))[:2]
+                y0, y1 = y_pred[i0], y_pred[i1]
+                x0, x1 = x_pred[i0], x_pred[i1]
+                # perform linear interpolation to find x at the TABLE_HEIGHT
+                if y0 != y1:
+                    x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
+                else:
+                    x = x0
+
                 # print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
                 last_time_sampled = time.time()
                 self.result_queue.put_coord((x, TABLE_HEIGHT))

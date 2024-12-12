@@ -18,6 +18,8 @@ RIGHT_BOUND = 428
 CENTRE = 247
 
 SAMPLE_TIME = 0.1
+#Sample @ time  0.2, 0.4, 0.5, 0.55, 0.60, 0.65, 0.67
+SAMPLE_TIMES = [0.2, 0.2, 0.1, 0.05, 0.05, 0.05, 0.02] # add to 0.6 TODO
 
 
 
@@ -40,7 +42,7 @@ def run_kalman(coord_queue: CoordQueue2D, output_queue: CoordQueue2D, pipeline: 
         if preds is not None:
             x_list, y_list = preds  
 
-            if run_count < 6 and time.time() - last_time_sampled > SAMPLE_TIME:
+            if run_count < 7 and time.time() - last_time_sampled > SAMPLE_TIMES[run_count]:
                 last_time_sampled = time.time()
                 x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
                 print(f"Front cam: {x}")
@@ -56,6 +58,7 @@ def run_kalman(coord_queue: CoordQueue2D, output_queue: CoordQueue2D, pipeline: 
             run_count = 0
             output_queue.reset_queue()
 
+# Main thread is the "feed frames" for front camera
 def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: SignalStart):
     cap = cv2.VideoCapture(0)
     cap.set(3, 1920) # set the resolution
@@ -63,6 +66,7 @@ def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: Sig
 
     coord_queue = CoordQueue2D()
 
+    # Thread runs kalman
     Thread(target=run_kalman, args=(coord_queue, output_queue, pipeline, signal)).start()
 
     startTime = time.monotonic()

@@ -7,7 +7,7 @@ import time
 from pipeline_2d import Pipeline2D, Pipeline2D_CAM2
 from queue_utils import CoordQueue2D, FrameQueue, SignalStart
 from threading import Thread
-from detect import detect_frame
+from detect import detect_frame as detect_frame
 from cam2 import run_cam2
 
 import json
@@ -75,6 +75,8 @@ def serialize_loop():
             gantry_x = -10
         else:
             # gantry_x = (x - SIDE_CENTRE) / 7.5
+
+            # TODO: fix
             gantry_x = (x - SIDE_CENTRE) / ((SIDE_RIGHT_BOUND - SIDE_LEFT_BOUND) / 2) * 10
             if gantry_x < -10: gantry_x = -10
             if gantry_x > 10: gantry_x = 10
@@ -84,6 +86,7 @@ def serialize_loop():
         elif y < FRONT_LEFT_BOUND:
             gantry_y = 10
         else:
+            # TODO: fix
             gantry_y = (FRONT_CENTRE - y) / ((FRONT_RIGHT_BOUND - FRONT_LEFT_BOUND) / 2) * 10
             if gantry_y < -10: gantry_y = -10
             if gantry_y > 10: gantry_y = 10
@@ -153,22 +156,22 @@ def feed_frames():
 
 
 if __name__ == '__main__':
-
-    
     s = None
     grbl = False
     plotter = RealTimePlotter()
     plotter.show()
     
-
-
     ################# Prediction Pipeline Setup #################
     # frame_queue = FrameQueue()
+
+    # Side camera data structures
     coord_queue = CoordQueue2D()
     result_queue = CoordQueue2D()
     debug_queue = FrameQueue()
-    predict = Pipeline2D(coord_queue, result_queue, debug_queue)
+    predict = Pipeline2D(coord_queue, result_queue, debug_queue) # side camera
     
+
+    # Front camera data structures
     result_queue_cam2 = CoordQueue2D()
     pipeline_cam2 = Pipeline2D_CAM2()
     signal_cam2 = SignalStart()
@@ -190,11 +193,19 @@ if __name__ == '__main__':
             # initialize grbl connection
             serial_comms_gcode.grbl_init(s)
 
+        # Sends to gantry
         Thread(target=serialize_loop).start()
+
+        # Takes in frame from the luxonis camera
         Thread(target=feed_frames).start()
+
         # Thread(target=run_cam2, args=(pipeline_cam2, result_queue_cam2, signal_cam2, )).start()
         # predict.run(s)
+
+        # Side camera prediction pipeline
         Thread(target=predict.run, args=(s,)).start()
+
+        # Front camera prediction pipeline
         run_cam2(pipeline_cam2, result_queue_cam2, signal_cam2)
        
 
@@ -212,3 +223,15 @@ if __name__ == '__main__':
             
     # TODO: Uncomment to integrate serial
     # s.close()
+
+
+
+'''
+    Potential Optimizations:
+        - Real world mapping is a bit jank rn (especially the front)
+        - Interpolation (don't find the exact closest point, interpolate between the two closest points if it's not exactly at y)
+        - Decrease of time between movements as it gets closer to the target
+        - Dynamic FPS
+
+
+'''
