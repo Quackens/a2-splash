@@ -158,6 +158,7 @@ def feed_frames():
 if __name__ == '__main__':
     s = None
     grbl = False
+    global plotter
     plotter = RealTimePlotter()
     plotter.show()
     

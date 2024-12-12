@@ -68,7 +68,12 @@ def visualize_gaussian_addition(array_size=20, x=0, y=0, gaussian_width=5):
 
 
 class RealTimePlotter:
+    def reset(self):
+        self.x, self.y = None, None
+
     def __init__(self):
+        self.x, self.y = None, None
+
         # Create a figure and two subplots side by side
         self.fig, (self.shotmap, self.heatmap) = plt.subplots(1, 2, figsize=(10, 5))
 
@@ -220,6 +225,13 @@ class RealTimePlotter:
 
         # Update the plot after 
         self.update_plot()
+
+    # Updates based on internal saved x and y values given by the cameras
+    def update_saved(self):
+        if self.x != None and self.y != None:
+            print("Visualizing {self.x}, {self.y}")
+            self.add_point(self.x, self.y)
+            self.reset() # reset x and y to None
 
     def onclick(self, event):
         if event.inaxes:

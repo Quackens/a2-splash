@@ -5,6 +5,8 @@ import time
 from detect import detect_frame
 import gcode.serial_comms_gcode as serial_comms_gcode
 
+from improved_metrics import RealTimePlotter
+from main import plotter
 
 TABLE_HEIGHT = 874 # Height of the table in pixels (WxH)
 
@@ -167,6 +169,21 @@ class Pipeline2D:
             self.observed_x.append(xo)
             self.observed_y.append(yo)
 
+            # If yo is detected to be below TABLE_HEIGHT, then STOP all predictions.
+            # Relay true x to visualization script.
+            if (yo < TABLE_HEIGHT):
+                y0, y1 = self.observed_y[-1], self.observed_y[-2]
+                x0, x1 = self.observed_x[-1], self.observed_x[-2]
+                if y0 != y1:
+                    x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
+                else:
+                    x = x0
+                plotter.x = x
+
+                # if y has been supplied by the front camera already, visualize
+                # else, visualization is done by the front camera pipeline.
+                plotter.update_saved() 
+
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
             # self.listCenterX.append(xo)
             # self.listCenterY.append(yo)
@@ -317,6 +334,12 @@ class Pipeline2D_CAM2:
         if xo is None and yo is None:
             # cv.imshow("video", canvas)
             return
+        
+        # for visualization
+        # if y has been supplied by the front camera already, visualize
+        # else, visualization is done by the front camera pipeline.
+        plotter.y = yo
+        plotter.update_saved()
 
         # cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 
