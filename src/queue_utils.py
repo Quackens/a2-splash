@@ -33,8 +33,11 @@ class CoordQueue2D:
         self.frames = Queue()
 
     def get_coord(self):
-        return self.frames.get()
-    
+        try:
+            return self.frames.get()
+        except:
+            return None
+        
     def put_coord(self, frame):
         self.frames.put(frame)
         return True
@@ -48,10 +51,18 @@ class CoordQueue2D:
 class SignalStart:
     def __init__(self):
         self.start = False
+        self.reset = False
 
     def get_start(self):
         return self.start
     
     def set_start(self, start):
         self.start = start
+        return True
+
+    def get_reset(self):
+        return self.reset
+    
+    def set_reset(self, reset):
+        self.reset = reset
         return True

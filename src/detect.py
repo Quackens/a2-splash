@@ -2,11 +2,10 @@ import cv2
 import imutils
 import numpy as np
 from pathlib import Path
+fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 
 def detect_frame(frame):
-    # print(frame)
-    # orangeLower = (6, 150, 200)
-    # orangeUpper = (25, 255, 255)
+
     orangeLower = (3, 150, 150)
     orangeUpper = (30, 255, 255)
 
@@ -19,18 +18,6 @@ def detect_frame(frame):
     mask = cv2.inRange(hsv, orangeLower, orangeUpper)
     mask = cv2.erode(mask, None, iterations=2)
     mask = cv2.dilate(mask, None, iterations=2)
-
-    # Trying with moments
-    # cx, cy = None, None
-    # moments = cv2.moments(mask)
-    # if moments["m00"] != 0:
-    # # Centroid (x, y)
-    #     cx = int(moments["m10"] / moments["m00"])  # x-coordinate
-    #     cy = int(moments["m01"] / moments["m00"])  # y-coordinate
-    #     cv2.circle(mask, (cx, cy), 20, (255, 0, 255), 1)
-
-    # cv2.imshow("orange", mask)
-    # return cx, cy
 
 
     # find contours in the mask and initialize the current
@@ -55,7 +42,7 @@ def detect_frame(frame):
             return center
         
 
-fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
+
 def detect_frame_2(frame):
     # print(frame)
     # orangeLower = (6, 150, 200)
@@ -104,7 +91,8 @@ def click_event(event, x, y, flags, params):
 # Testing pipeline
 if __name__ == "__main__":
     video_path = "../out/combined.mp4"
-    cap = cv2.VideoCapture(video_path)
+    # cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(0)
     wait_time = 10
     frame = None
     Path("coords").unlink(missing_ok=True)
@@ -139,7 +127,7 @@ if __name__ == "__main__":
         if not centre:
             cv2.imshow("video", frame)
             continue
-        cv2.circle(frame, centre, 5, (0, 0, 255), -1)
+        cv2.circle(frame, centre, 20, (0, 0, 255), -1)
 
         cv2.imshow("video", frame)
         cv2.setMouseCallback('video', click_event)

@@ -22,7 +22,8 @@ import gcode.serial_comms_gcode as serial_comms_gcode
 
 
 def serialize_loop():
-    global s 
+
+    # global s 
     global result_queue
     global result_queue_cam2
     from pipeline_2d import CUP_LEFT_X, CUP_RIGHT_X, CUP_CENTRE_X
@@ -41,16 +42,24 @@ def serialize_loop():
     while True:
         
         # Coordinate update from both queues simultaneously 
+        # print(f"Side length: {result_queue.get_length()}, Front length: {result_queue_cam2.get_length()}")
+        # print("Getting sideview..")
         coord_sideview = result_queue.get_coord()
+        # print("Getting frontview..")
         coord_frontview = result_queue_cam2.get_coord()
-        print(f"Sideview: {coord_sideview}, Frontview: {coord_frontview}")
+        
+        # print(f"SIDE_LEFT_BOUND: {SIDE_LEFT_BOUND}, SIDE_RIGHT_BOUND: {SIDE_RIGHT_BOUND}")
+        # print(f"FRONT_LEFT_BOUND: {FRONT_LEFT_BOUND}, FRONT_RIGHT_BOUND: {FRONT_RIGHT_BOUND}")
         x, y = None, None
         if coord_sideview is None and coord_frontview is None:
             continue
-        elif coord_sideview is not None:
+        # print(f"Sideview: {coord_sideview}, Frontview: {coord_frontview}")
+        if coord_sideview is not None:
             x, _ = coord_sideview
-        elif coord_frontview is not None:
-            _, y = coord_frontview
+        if coord_frontview is not None:
+            y, _ = coord_frontview
+        # x, _ = coord_sideview
+        # y, _ = coord_frontview
         if x is None: x = prev_x
         if y is None: y = prev_y
 
@@ -61,23 +70,30 @@ def serialize_loop():
         elif x < SIDE_LEFT_BOUND:
             gantry_x = -10
         else:
-            gantry_x = (x - SIDE_CENTRE) / 7.5
-
-        # Normalize the y coordinate
+            # gantry_x = (x - SIDE_CENTRE) / 7.5
+            gantry_x = (x - SIDE_CENTRE) / ((SIDE_RIGHT_BOUND - SIDE_LEFT_BOUND) / 2) * 10
+            if gantry_x < -10: gantry_x = -10
+            if gantry_x > 10: gantry_x = 10
+        # Normalize the y coordinate    
         if y > FRONT_RIGHT_BOUND:
             gantry_y = -10
         elif y < FRONT_LEFT_BOUND:
             gantry_y = 10
         else:
             gantry_y = (FRONT_CENTRE - y) / ((FRONT_RIGHT_BOUND - FRONT_LEFT_BOUND) / 2) * 10
-        
-        print(f"Sent to arduino: {gantry_x} {gantry_y}")
-        serial_comms_gcode.gcode_goto(s, gantry_x, gantry_y)
+            if gantry_y < -10: gantry_y = -10
+            if gantry_y > 10: gantry_y = 10
+        prev_x = x
+        prev_y = y
+        print(f"Send as grbl: {gantry_x} {0}")
+        if grbl:
+            serial_comms_gcode.gcode_goto(s, gantry_x, 0)
         
 
 
 
 def feed_frames():
+    global signal_cam2
     # Create pipeline
     pipeline = dai.Pipeline()
 
@@ -133,12 +149,12 @@ def feed_frames():
 
 
 if __name__ == '__main__':
-    # TODO: Uncomment to integrate serial
-    # Open grbl serial port
-    s = serial.Serial('/dev/tty.usbmodem2101',115200)
 
-    # initialize grbl connection
-    serial_comms_gcode.grbl_init(s)
+    
+    s = None
+    grbl = False
+        
+    
 
 
     ################# Prediction Pipeline Setup #################
@@ -162,10 +178,20 @@ if __name__ == '__main__':
 
     
     if sys.argv[1] == "live":
+        if len(sys.argv) > 2 and sys.argv[2] == "grbl":
+            grbl = True
+            # Open grbl serial port
+            s = serial.Serial('/dev/tty.usbmodem21101',115200)
+            # initialize grbl connection
+            serial_comms_gcode.grbl_init(s)
+
         Thread(target=serialize_loop).start()
         Thread(target=feed_frames).start()
         Thread(target=run_cam2, args=(pipeline_cam2, result_queue_cam2, signal_cam2, )).start()
         predict.run(s)
+        # Thread(target=predict.run, args=(s,)).start()
+        # run_cam2(pipeline_cam2, result_queue_cam2, signal_cam2)
+       
 
     elif sys.argv[1] == "test":
         # Load in json file
@@ -180,4 +206,4 @@ if __name__ == '__main__':
 
             
     # TODO: Uncomment to integrate serial
-    s.close()
+    # s.close()
