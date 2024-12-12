@@ -8,18 +8,20 @@ import gcode.serial_comms_gcode as serial_comms_gcode
 
 
 # TODO: realign
-TABLE_HEIGHT = 815 # Height of the table in pixels (WxH)
+TABLE_HEIGHT = 874 # Height of the table in pixels (WxH)
 
-CUP_LEFT_X = 102 # Left edge of the cup in pixels (WxH)
+CUP_LEFT_X = 115 # Left edge of the cup in pixels (WxH)
 CUP_CENTRE_X = 200 # Centre of the cup in pixels (WxH)
-CUP_RIGHT_X = 270 # Right edge of the cup in pixels (WxH)
+CUP_RIGHT_X = 275 # Right edge of the cup in pixels (WxH)
 
 
 
 SAMPLE_TIME = 0.1 # seconds (to put into result queue)
 
-GRAVITY = 9740 # Tuning parameter [a] good for now
-GRAVITY = 8600
+# GRAVITY = 9740 # Tuning parameter [a] good for now
+# GRAVITY = 8600
+# GRAVITY = 9200
+GRAVITY = 9400
 class Pipeline2D:
     
     def __init__(self, coord_queue, result_queue, debug_queue):

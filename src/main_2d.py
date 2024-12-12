@@ -111,7 +111,7 @@ def feed_frames():
 if __name__ == '__main__':
     # TODO: Uncomment to integrate serial
     # Open grbl serial port
-    s = serial.Serial('/dev/tty.usbmodem101',115200)
+    s = serial.Serial('/dev/tty.usbmodem21101',115200)
 
     # initialize grbl connection
     serial_comms_gcode.grbl_init(s)
