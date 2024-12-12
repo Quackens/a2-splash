@@ -180,7 +180,7 @@ def feed_frames():
 if __name__ == '__main__':
     s = None
     grbl = False
-    global plotter
+    # global plotter
     plotter = RealTimePlotter()
     plotter.show()
     
@@ -191,12 +191,12 @@ if __name__ == '__main__':
     coord_queue = CoordQueue2D()
     result_queue = CoordQueue2D()
     debug_queue = FrameQueue()
-    predict = Pipeline2D(coord_queue, result_queue, debug_queue) # side camera
+    predict = Pipeline2D(coord_queue, result_queue, debug_queue, plotter) # side camera
     
 
     # Front camera data structures
     result_queue_cam2 = CoordQueue2D()
-    pipeline_cam2 = Pipeline2D_CAM2()
+    pipeline_cam2 = Pipeline2D_CAM2(plotter)
     signal_cam2 = SignalStart()
 
     ################# Connect to device and start pipeline #################

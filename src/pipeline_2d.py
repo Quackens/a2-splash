@@ -6,7 +6,7 @@ from detect import detect_frame
 import gcode.serial_comms_gcode as serial_comms_gcode
 
 from improved_metrics import RealTimePlotter
-from main import plotter
+# from main import plotter
 
 TABLE_HEIGHT = 845 # Height of the table in pixels (WxH)
 
@@ -26,11 +26,11 @@ GRAVITY = 8600
 
 class Pipeline2D:
     
-    def __init__(self, coord_queue, result_queue, debug_queue):
+    def __init__(self, coord_queue, result_queue, debug_queue, plotter):
         width = 1920
         height = 1080
         self.myvideo=cv.VideoWriter("../out/out.avi", cv.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
-
+        self.plotter = plotter
         fps = 57
         dt = 1/fps
         noise = 3
@@ -176,21 +176,23 @@ class Pipeline2D:
 
             # If yo is detected to be below TABLE_HEIGHT, then STOP all predictions.
             # Relay true x to visualization script.
-            if (yo < TABLE_HEIGHT):
+
+                
+                
+            if ((xo < 400) and (yo > TABLE_HEIGHT)):
+                self.stop_run = True
+
                 y0, y1 = self.observed_y[-1], self.observed_y[-2]
                 x0, x1 = self.observed_x[-1], self.observed_x[-2]
                 if y0 != y1:
                     x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
                 else:
                     x = x0
-                plotter.x = x
+                self.plotter.x = x
 
                 # if y has been supplied by the front camera already, visualize
                 # else, visualization is done by the front camera pipeline.
-                plotter.update_saved() 
-                
-            if ((xo < 400) and (yo > TABLE_HEIGHT)):
-                self.stop_run = True
+                self.plotter.update_saved() 
 
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
             # self.listCenterX.append(xo)
@@ -256,7 +258,7 @@ class Pipeline2D:
 
 class Pipeline2D_CAM2:
     
-    def __init__(self):
+    def __init__(self, plotter):
         width = 1920
         height = 1080
         # self.myvideo=cv.VideoWriter("../out/out.avi", cv.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
@@ -297,7 +299,7 @@ class Pipeline2D_CAM2:
 
         self.Q = sigmaM**2 * np.eye(4)   # processNoiseCov
         self.R = sigmaZ**2 * np.eye(2)   # measurementNoiseCov
-
+        self.plotter = plotter
 
     def reset(self):
         self.mu = np.array([0, 0, 0, 0])
@@ -351,8 +353,8 @@ class Pipeline2D_CAM2:
         # for visualization
         # if y has been supplied by the front camera already, visualize
         # else, visualization is done by the front camera pipeline.
-        plotter.y = yo
-        plotter.update_saved()
+        self.plotter.y = xo
+        self.plotter.update_saved()
 
         # cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 
