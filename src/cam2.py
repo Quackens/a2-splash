@@ -13,13 +13,16 @@ GRAVITY = 8600
 
 # In pixels
 HEIGHT = 1000
-LEFT_BOUND = 74
-RIGHT_BOUND = 428
+LEFT_BOUND = 77
+RIGHT_BOUND = 407
 CENTRE = 247
 
 # SAMPLE_TIME = 0.1
 #Sample @ time  0.2, 0.4, 0.5, 0.55, 0.60, 0.65, 0.67
-SAMPLE_TIMES = [0.2, 0.2, 0.1, 0.1, 0.1] # add to 0.6 TODO
+# SAMPLE_TIMES = [0.25, 0.25, 0.1, 0.1] # add to 0.6 TODO
+# FIRST ONE DUMMY
+SAMPLE_TIMES = [0, 0.2, 0.2, 0.15, 0.1] # add to 0.6 TODO
+# SAMPLE_TIMES = [0.4, 0.1, 0.1, 0.1] # add to 0.6 TODO
 
 
 
@@ -43,6 +46,10 @@ def run_kalman(coord_queue: CoordQueue2D, output_queue: CoordQueue2D, pipeline: 
             x_list, y_list = preds  
 
             if run_count < len(SAMPLE_TIMES) and time.time() - last_time_sampled > SAMPLE_TIMES[run_count]:
+                if run_count == 0:
+                    last_time_sampled = time.time()
+                    run_count += 1
+                    continue
                 last_time_sampled = time.time()
                 x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
                 print(f"Front cam: {x}")
