@@ -6,15 +6,17 @@ from detect import detect_frame
 import gcode.serial_comms_gcode as serial_comms_gcode
 
 
-TABLE_HEIGHT = 878 # Height of the table in pixels (WxH)
+TABLE_HEIGHT = 874 # Height of the table in pixels (WxH)
 
-CUP_LEFT_X = 123 # Left edge of the cup in pixels (WxH)
+CUP_LEFT_X = 120 # Left edge of the cup in pixels (WxH)
 CUP_CENTRE_X = 200 # Centre of the cup in pixels (WxH)
 CUP_RIGHT_X = 281 # Right edge of the cup in pixels (WxH)
 
 SAMPLE_TIME = 0.1 # seconds (to put into result queue)
 
 GRAVITY = 8600
+# GRAVITY = 9400
+
 
 class Pipeline2D:
     
@@ -68,6 +70,9 @@ class Pipeline2D:
         self.last_prediction = None
         self.last_run = time.time()
         self.run_count = 0
+        self.start_time = time.time()
+        self.observed_x = []
+        self.observed_y = []
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
         # B : controlMatrix -->  B @ u : gravity
         x_pred = A @ x_esti + B @ u           
@@ -102,14 +107,27 @@ class Pipeline2D:
         self.last_prediction = None
         self.last_run = time.time()
         self.run_count = 0
-        # self.result_queue.reset_queue()
+        self.result_queue.reset_queue()
+        if self.observed_x and self.observed_y:
+            x = self.observed_x[np.argmin(np.abs(np.array(self.observed_y) - TABLE_HEIGHT))]
+            if x > CUP_RIGHT_X:
+                gantry_x = 10
+            elif x < CUP_LEFT_X:
+                gantry_x = -10
+            else:
+                gantry_x = (x - CUP_CENTRE_X) / ((CUP_RIGHT_X - CUP_LEFT_X) / 2) *  10
+                if gantry_x < -10: gantry_x = -10
+                if gantry_x > 10: gantry_x = 10
+            print(f"Actual Side: {gantry_x}")
+        self.observed_x = []
+        self.observed_y = []
 
     
     def test(self, data_list):
         last_prediction = None
         last_time_sampled = 0
         wait_time = 1
-        start_time = time.time()
+        # start_time = time.time()
         # TABLE_HEIGHT = data_list[-1][1]
         print(f"Table Height: {TABLE_HEIGHT}")
         print(f"Last coord: {data_list[-1]}")
@@ -165,16 +183,16 @@ class Pipeline2D:
 
             
             
-            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.4:
+            if time.time() - last_time_sampled > SAMPLE_TIME and time.time() - self.start_time > 0.4:
                 # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
                 x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
                 # print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
                 last_time_sampled = time.time()
                 self.result_queue.put_coord((x, TABLE_HEIGHT))
-                
+                print(f"Side cam: {x}")
                 if x < CUP_RIGHT_X and x > CUP_LEFT_X:
                     last_prediction = x
-
+                
                 cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
             if last_prediction:
                 cv.circle(canvas, (int(last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
@@ -184,7 +202,7 @@ class Pipeline2D:
         
         last_time_sampled = 0
         wait_time = 1
-        start_time = time.time()
+        
         self.last_run = time.time()
 
         print(f"Table Height: {TABLE_HEIGHT}")
@@ -204,23 +222,25 @@ class Pipeline2D:
             cv.circle(canvas, (CUP_CENTRE_X, TABLE_HEIGHT), 5, (255, 255, 0), -1)
 
             # Debugging window
-            key = cv.waitKey(1)
-            if key == ord('q'):
-                break
-            if key == ord('r'):
-                print("RESET")
-                self.reset(serial)
+            # key = cv.waitKey(1)
+            # if key == ord('q'):
+            #     break
+            # if key == ord('r'):
+            #     print("RESET")
+            #     self.reset(serial)
 
 
             if coords is None:
-                cv.imshow("video", canvas)
+                # cv.imshow("video", canvas)
                 continue
 
             xo, yo = coords
             if xo is None and yo is None:
-                cv.imshow("video", canvas)
+                # cv.imshow("video", canvas)
                 continue
             cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
+            self.observed_x.append(xo)
+            self.observed_y.append(yo)
 
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
             # self.listCenterX.append(xo)
@@ -251,7 +271,7 @@ class Pipeline2D:
 
             
             
-            if self.run_count < 6 and time.time() - last_time_sampled > SAMPLE_TIME and time.time() - start_time > 0.2:
+            if self.run_count < 6 and time.time() - last_time_sampled > SAMPLE_TIME and time.time() - self.start_time > 0.2:
                 # Find the x_estimate where y_estimate is closest to TABLE_HEIGHT
                 x = x_pred[np.argmin(np.abs(np.array(y_pred) - TABLE_HEIGHT))]
                 # print(f"Predicted x: {x}, y: {TABLE_HEIGHT}")
@@ -260,12 +280,12 @@ class Pipeline2D:
                 self.run_count += 1
                 if x < CUP_RIGHT_X and x > CUP_LEFT_X:
                     self.last_prediction = x
-
+                print(f"Side cam: {x}")
                 cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
             if self.last_prediction:
                 cv.circle(canvas, (int(self.last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
             
-            cv.imshow("video", canvas)
+            # cv.imshow("video", canvas)
             
 
 
@@ -277,7 +297,7 @@ class Pipeline2D_CAM2:
         height = 1080
         # self.myvideo=cv.VideoWriter("../out/out.avi", cv.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
 
-        fps = 57
+        fps = 50
         dt = 1/fps
         noise = 3
         sigmaM = 0.0001

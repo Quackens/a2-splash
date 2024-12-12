@@ -46,7 +46,9 @@ class CoordQueue2D:
         return self.frames.qsize()
     
     def reset_queue(self):
-        self.frames = Queue()
+        # self.frames = Queue()
+        while self.frames.qsize() > 0:
+            self.frames.get()
 
 class SignalStart:
     def __init__(self):

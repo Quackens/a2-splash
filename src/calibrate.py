@@ -29,7 +29,7 @@ if write_video:
     myvideo=cv2.VideoWriter("../out/color_tune_60fps.avi", cv2.VideoWriter_fourcc('M','J','P','G'), 60, (int(width),int(height)))
 
 if sys.argv[1] == "-side":
-    s = serial.Serial('/dev/tty.usbmodem2101',115200)
+    s = serial.Serial('/dev/tty.usbmodem21101',115200)
     serial_comms_gcode.grbl_init(s)
     # Create pipeline
     pipeline = dai.Pipeline()

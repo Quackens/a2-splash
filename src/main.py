@@ -42,10 +42,13 @@ def serialize_loop():
     while True:
         
         # Coordinate update from both queues simultaneously 
-        # print(f"Side length: {result_queue.get_length()}, Front length: {result_queue_cam2.get_length()}")
+        print(f"Side length: {result_queue.get_length()}, Front length: {result_queue_cam2.get_length()}")
         # print("Getting sideview..")
         coord_sideview = result_queue.get_coord()
         # print("Getting frontview..")
+        # if result_queue_cam2.get_length() > 6:
+        #     result_queue_cam2.reset_queue()
+
         coord_frontview = result_queue_cam2.get_coord()
         
         # print(f"SIDE_LEFT_BOUND: {SIDE_LEFT_BOUND}, SIDE_RIGHT_BOUND: {SIDE_RIGHT_BOUND}")
@@ -85,9 +88,9 @@ def serialize_loop():
             if gantry_y > 10: gantry_y = 10
         prev_x = x
         prev_y = y
-        print(f"Send as grbl: {gantry_x} {0}")
+        print(f"Send as grbl: {gantry_x} {gantry_y}")
         if grbl:
-            serial_comms_gcode.gcode_goto(s, gantry_x, 0)
+            serial_comms_gcode.gcode_goto(s, gantry_x, gantry_y)
         
 
 
@@ -187,10 +190,10 @@ if __name__ == '__main__':
 
         Thread(target=serialize_loop).start()
         Thread(target=feed_frames).start()
-        Thread(target=run_cam2, args=(pipeline_cam2, result_queue_cam2, signal_cam2, )).start()
-        predict.run(s)
-        # Thread(target=predict.run, args=(s,)).start()
-        # run_cam2(pipeline_cam2, result_queue_cam2, signal_cam2)
+        # Thread(target=run_cam2, args=(pipeline_cam2, result_queue_cam2, signal_cam2, )).start()
+        # predict.run(s)
+        Thread(target=predict.run, args=(s,)).start()
+        run_cam2(pipeline_cam2, result_queue_cam2, signal_cam2)
        
 
     elif sys.argv[1] == "test":
