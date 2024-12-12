@@ -17,9 +17,9 @@ LEFT_BOUND = 74
 RIGHT_BOUND = 428
 CENTRE = 247
 
-SAMPLE_TIME = 0.1
+# SAMPLE_TIME = 0.1
 #Sample @ time  0.2, 0.4, 0.5, 0.55, 0.60, 0.65, 0.67
-SAMPLE_TIMES = [0.2, 0.2, 0.1, 0.05, 0.05, 0.05, 0.02] # add to 0.6 TODO
+SAMPLE_TIMES = [0.2, 0.2, 0.1, 0.1, 0.1] # add to 0.6 TODO
 
 
 
@@ -42,7 +42,7 @@ def run_kalman(coord_queue: CoordQueue2D, output_queue: CoordQueue2D, pipeline: 
         if preds is not None:
             x_list, y_list = preds  
 
-            if run_count < 7 and time.time() - last_time_sampled > SAMPLE_TIMES[run_count]:
+            if run_count < len(SAMPLE_TIMES) and time.time() - last_time_sampled > SAMPLE_TIMES[run_count]:
                 last_time_sampled = time.time()
                 x = x_list[np.argmin(np.abs(np.array(y_list) - HEIGHT))]
                 print(f"Front cam: {x}")
