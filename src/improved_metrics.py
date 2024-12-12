@@ -90,15 +90,14 @@ class RealTimePlotter:
 
         # automatically remove old gaussians when new ones are added
         # saves the past 10 shots
-        self.gauss_queue = deque(maxlen=10)
+        self.recent_len = 10
+        self.gauss_queue = deque(maxlen=self.recent_len)
 
         # Create a 2D numpy array for the heatmap data
-        # heatmap_data = np.random.rand(80, 80)  # Example data, replace with your actual data
         self.hmres = 80 # heatmap resolution
         self.gauss_width = 20
         # self.heatmap_data = np.zeros((self.hmres, self.hmres))  # Example data, replace with your actual data
         self.heatmap_data = np.random.rand(self.hmres, self.hmres)  # Example data, replace with your actual data
-        print(self.heatmap_data.shape)
 
         # Display the heatmap over the self.heatmap graph
         self.extent = [-20, 20, -20, 20]  # Define the extent of the heatmap
@@ -171,21 +170,31 @@ class RealTimePlotter:
         # Session metrics
         self.total_shots = 0
         self.splash_shots = 0
-        self.avg_percentage = 0.0
-        self.avg_text = f' Session Accuracy: {self.avg_percentage:.1f}% ({self.splash_shots}/{self.total_shots})'
+        self.session_percent = 0.0
+        self.session_percent_text = f' Session Accuracy: {self.session_percent:.1f}% ({self.splash_shots}/{self.total_shots})'
+
+        self.recent_shots = deque(maxlen=self.recent_len)
+        self.recent_percent = 0.0
+        self.recent_percent_text = f'Recent Accuracy: {self.session_percent:.1f}% ({np.sum(self.recent_shots)}/{len(self.recent_shots)})'
+        
         # Add text annotation for accuracy between the two subplots
-        self.avg_display = self.fig.text(0.5, 0.05, self.avg_text, 
+        self.avg_display = self.fig.text(0.5, 0.05, self.session_percent_text, 
+            horizontalalignment='center', verticalalignment='center', fontsize=12)
+        self.recent_display = self.fig.text(0.5, 0.02, self.recent_percent_text,
             horizontalalignment='center', verticalalignment='center', fontsize=12)
 
         # Set aspect ratio to be equal. Thus when resizing window, graphs stay square.
         self.shotmap.set_aspect('equal', adjustable='box')
         self.heatmap.set_aspect('equal', adjustable='box')
 
-        # Fits the graphs to the borders? Not necessary
-        # plt.tight_layout()
+        legend_elements = [self.sm_square, self.sm_circle]
+        # Create legend handles with labels
+        legend_labels = ['Catch Zone', 'Splash Zone']
+        self.fig.legend(legend_elements, legend_labels, loc='upper center', bbox_to_anchor=(0.5, 0.95), 
+                        ncol=2, fancybox=True, shadow=True, framealpha=1)
+
 
     def add_point(self, x, y):
-        # print(f"x={x}, y={y}")
         point = (x, y)
         self.points.append(point)
 
@@ -201,10 +210,15 @@ class RealTimePlotter:
         if self.heatmap_data.max() > 0:
             self.heatmap_data = self.heatmap_data / self.heatmap_data.max()
 
+        # Update session metrics
         self.total_shots += 1
         if self.circle_path.contains_point(point): 
             self.splash_shots += 1
+            self.recent_shots.append(1)
+        else:
+            self.recent_shots.append(0)        
 
+        # Update the plot after 
         self.update_plot()
 
     def onclick(self, event):
@@ -245,24 +259,21 @@ class RealTimePlotter:
                 out_xs.append(point[0])
                 out_ys.append(point[1])
 
-        avg_percentage = (self.splash_shots / self.total_shots) * 100 if self.total_shots > 0 else 0
-        avg_text = f'Session Accuracy: {avg_percentage:.1f}% ({self.splash_shots}/{self.total_shots})'
-        self.avg_display.set_text(avg_text)
+        session_percent = (self.splash_shots / self.total_shots) * 100 if self.total_shots > 0 else 0
+        session_percent_text = f'Session Accuracy: {session_percent:.1f}% ({self.splash_shots}/{self.total_shots})'
+        self.avg_display.set_text(session_percent_text)
+
+        self.recent_percent = (np.sum(self.recent_shots) / len(self.recent_shots)) * 100
+        self.recent_percent_text = f'Recent Accuracy: {self.recent_percent:.1f}% ({np.sum(self.recent_shots)}/{len(self.recent_shots)})'
+        self.recent_display.set_text(self.recent_percent_text)
+        
         
         # Create new scatter plot
-        # self.scatter = self.ax.scatter(x_coords, y_coords, c=colors, cmap='coolwarm', edgecolors='none')
-        # self.heat_scatter = plt.scatter(splash_xs, splash_ys, c='blue', s=200, marker='*', edgecolors='white', linewidths=0.75, zorder=4)
         self.shot_scatter = self.shotmap.scatter(splash_xs, splash_ys, c='blue', s=200, marker='*', edgecolors='white', linewidths=0.75, zorder=4)
-        # self.heat_scatter = self.heatmap.scatter(splash_xs, splash_ys, c='blue', s=200, marker='*', edgecolors='white', linewidths=0.75, zorder=4)
-    
         # in points
         self.shot_scatter = self.shotmap.scatter(in_xs, in_ys, c='green', s=100, marker='o', edgecolors='black', zorder=4)
-        # self.heat_scatter = self.heatmap.scatter(in_xs, in_ys, c='green', s=100, marker='o', edgecolors='black', zorder=4)
-        # self.scatter = plt.scatter(in_xs, in_ys, c='green', s=100, marker='o', edgecolors='black', zorder=4)
         # out points
         self.shot_scatter = self.shotmap.scatter(out_xs, out_ys, c='red', s=100, marker='X', edgecolors='black', zorder=4)
-        # self.heat_scatter = self.heatmap.scatter(out_xs, out_ys, c='red', s=100, marker='X', edgecolors='black', zorder=4)
-        # self.scatter = plt.scatter(out_xs, out_ys, c='red', s=100, marker='X', edgecolors='black', zorder=4)
         
         # Redraw
         self.fig.canvas.draw()
