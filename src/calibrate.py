@@ -18,6 +18,80 @@ def click_event(event, x, y, flags, params):
     # checking for left mouse clicks 
     if event == cv2.EVENT_LBUTTONDOWN: 
         print(f"X: {x}, Y: {y}")
+        print(f"Normalized X: {normalize_x(x)}")
+
+DEFAULT_XY = 15
+
+def normalize_x(x):
+    from pipeline_2d import CUP_LEFT_X, CUP_RIGHT_X, CUP_CENTRE_X
+    SIDE_LEFT_BOUND = CUP_LEFT_X
+    SIDE_RIGHT_BOUND = CUP_RIGHT_X
+    SIDE_CENTRE = CUP_CENTRE_X
+
+    # Normalize the x coordinate
+    if x <= SIDE_LEFT_BOUND-50:
+        gantry_x = -1 * DEFAULT_XY
+    elif x >= SIDE_RIGHT_BOUND+50:
+        gantry_x = DEFAULT_XY
+
+
+    elif SIDE_RIGHT_BOUND < x < SIDE_RIGHT_BOUND+50:
+        gantry_x = 10
+        # gantry_x = 5
+
+    elif SIDE_LEFT_BOUND-50 < x < SIDE_LEFT_BOUND:
+        gantry_x = -10
+        # gantry_x = -5
+
+    elif SIDE_LEFT_BOUND <= x <=SIDE_RIGHT_BOUND:
+        # gantry_x = (x - SIDE_CENTRE) / 7.5
+
+        # TODO: fix
+        # gantry_x = (x - SIDE_CENTRE) / ((SIDE_RIGHT_BOUND - SIDE_LEFT_BOUND) / 2) * 10
+        if x < SIDE_CENTRE:
+            gantry_x = ((x - SIDE_CENTRE) / (SIDE_CENTRE - SIDE_LEFT_BOUND)) * 10
+        else:
+            gantry_x = ((x - SIDE_CENTRE) / (SIDE_RIGHT_BOUND - SIDE_CENTRE)) * 10
+        
+        if gantry_x < -10: gantry_x = -10
+        if gantry_x > 10: gantry_x = 10
+    else:
+        gantry_x = DEFAULT_XY
+    return gantry_x
+
+def normalize_y(y):
+    from cam2 import LEFT_BOUND, RIGHT_BOUND, CENTRE
+    FRONT_LEFT_BOUND = LEFT_BOUND
+    FRONT_RIGHT_BOUND = RIGHT_BOUND
+    FRONT_CENTRE = CENTRE
+
+    # Normalize the y coordinate    
+    if y <= FRONT_LEFT_BOUND-50:
+        gantry_y = -1 * DEFAULT_XY
+    elif y >= FRONT_RIGHT_BOUND+50:
+        gantry_y = DEFAULT_XY
+
+    if FRONT_RIGHT_BOUND < y < FRONT_RIGHT_BOUND+50:
+        gantry_y = -10
+        # gantry_y = -5
+    elif FRONT_LEFT_BOUND-50 < y < FRONT_LEFT_BOUND:
+        gantry_y = 10
+        # gantry_y = 5
+    elif FRONT_LEFT_BOUND <= y <= FRONT_RIGHT_BOUND:
+        
+        # TODO: fix
+        # gantry_y = (FRONT_CENTRE - y) / ((FRONT_RIGHT_BOUND - FRONT_LEFT_BOUND) / 2) * 10
+        if y < FRONT_CENTRE:
+            gantry_y = ((FRONT_CENTRE - y) / (FRONT_CENTRE - FRONT_LEFT_BOUND)) * 10
+        else:
+            gantry_y = ((FRONT_CENTRE - y) / (FRONT_RIGHT_BOUND - FRONT_CENTRE)) * 10
+
+        if gantry_y < -10: gantry_y = -10
+        if gantry_y > 10: gantry_y = 10
+    else:
+        gantry_y = DEFAULT_XY
+    return gantry_y
+
               
 
 
@@ -30,7 +104,7 @@ if write_video:
 
 if sys.argv[1] == "-side":
     s = serial.Serial('/dev/tty.usbmodem21101',115200)
-    serial_comms_gcode.grbl_init(s)
+    # serial_comms_gcode.grbl_init(s)
     # Create pipeline
     pipeline = dai.Pipeline()
 

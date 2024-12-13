@@ -4,7 +4,7 @@ import queue_utils
 import time 
 from detect import detect_frame
 import gcode.serial_comms_gcode as serial_comms_gcode
-
+import chime
 from improved_metrics import RealTimePlotter
 # from main import plotter
 
@@ -23,13 +23,14 @@ SAMPLE_TIMES = [0, 0.2, 0.2, 0.15, 0.1] # add to 0.6 TODO
 GRAVITY = 8600
 # GRAVITY = 9400
 
+STOP_RUN = True
 
 class Pipeline2D:
     
     def __init__(self, coord_queue, result_queue, debug_queue, plotter):
-        width = 1920
-        height = 1080
-        self.myvideo=cv.VideoWriter("../out/out.avi", cv.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
+        # width = 1920
+        # height = 1080
+        # self.myvideo=cv.VideoWriter("../out/out.avi", cv.VideoWriter_fourcc('M','J','P','G'), 30, (int(width),int(height)))
         self.plotter = plotter
         fps = 57
         dt = 1/fps
@@ -80,6 +81,7 @@ class Pipeline2D:
         self.observed_x = []
         self.observed_y = []
         self.stop_run = False
+        STOP_RUN = False
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
         # B : controlMatrix -->  B @ u : gravity
         x_pred = A @ x_esti + B @ u           
@@ -125,10 +127,17 @@ class Pipeline2D:
                 gantry_x = (x - CUP_CENTRE_X) / ((CUP_RIGHT_X - CUP_LEFT_X) / 2) *  10
                 if gantry_x < -10: gantry_x = -10
                 if gantry_x > 10: gantry_x = 10
-            print(f"Actual Side: {gantry_x}")
+            # print(f"Actual Side: {gantry_x}")
         self.observed_x = []
         self.observed_y = []
-        self.stop_run = False
+        if (self.stop_run):
+            self.stop_run = False
+            STOP_RUN = False
+            chime.success()
+
+
+
+        # print("\tSTOP RUN RESET!")
 
     def run(self, serial):
         
@@ -160,7 +169,8 @@ class Pipeline2D:
             # if key == ord('r'):
             #     print("RESET")
             #     self.reset(serial)
-
+            if self.stop_run:
+                continue
 
             if coords is None:
                 # cv.imshow("video", canvas)
@@ -178,21 +188,21 @@ class Pipeline2D:
             # Relay true x to visualization script.
 
                 
-                
+            # print(f"\tSide Camera, x: {xo}\ty: {yo}")
             if ((xo < 400) and (yo > TABLE_HEIGHT)):
+                # print("\t***STOPPING RUN")
+                self.plotter.x = xo
+                # if len(self.observed_y) > 2:
+                #     y0, y1 = self.observed_y[-1], self.observed_y[-2]
+                #     x0, x1 = self.observed_x[-1], self.observed_x[-2]
+                #     if y0 != y1:
+                #         x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
+                #     else:
+                #         x = x0
+
+                #     self.plotter.x = x
                 self.stop_run = True
-
-                y0, y1 = self.observed_y[-1], self.observed_y[-2]
-                x0, x1 = self.observed_x[-1], self.observed_x[-2]
-                if y0 != y1:
-                    x = x0 + (TABLE_HEIGHT - y0) * (x1 - x0) / (y1 - y0)
-                else:
-                    x = x0
-                self.plotter.x = x
-
-                # if y has been supplied by the front camera already, visualize
-                # else, visualization is done by the front camera pipeline.
-                self.plotter.update_saved() 
+                STOP_RUN = True
 
             self.mu, self.P, _ = self.kalman(self.mu, self.P, self.A, self.Q, self.B, self.a, np.array([xo, yo]), self.H, self.R)
             # self.listCenterX.append(xo)
@@ -246,7 +256,7 @@ class Pipeline2D:
                 self.run_count += 1
                 if x < CUP_RIGHT_X and x > CUP_LEFT_X:
                     self.last_prediction = x
-                print(f"Side cam: {x}")
+                # print(f"Side cam: {x}")
                 cv.circle(canvas, (int(x), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
             if self.last_prediction:
                 cv.circle(canvas, (int(self.last_prediction), int(TABLE_HEIGHT)), 5, (0, 0, 255), -1)
@@ -269,6 +279,7 @@ class Pipeline2D_CAM2:
         sigmaM = 0.0001
         sigmaZ = 3*noise
         ac = dt**2/2
+        self.observed_x = []
 
         # A : transitionMatrix
         self.A = np.array(
@@ -304,6 +315,7 @@ class Pipeline2D_CAM2:
     def reset(self):
         self.mu = np.array([0, 0, 0, 0])
         self.P = 1000 ** 2 * np.eye(4)
+        # print("reset front cam")
 
 
     def kalman(self, x_esti, P, A, Q, B, u, z, H, R):
@@ -350,11 +362,24 @@ class Pipeline2D_CAM2:
             # cv.imshow("video", canvas)
             return
         
+        if STOP_RUN:
+            if len(self.observed_x) > 1: 
+                self.plotter.y = self.observed_x[-1]
+                # self.reset()
+                self.observed_x = []
+                return
+            # print(f"\tSTOP -- x: {xo}\ty: {yo}")
+            # print("\tSTOP RUN")
+
+        if xo is not None:
+            self.observed_x.append(xo)
+        
         # for visualization
         # if y has been supplied by the front camera already, visualize
         # else, visualization is done by the front camera pipeline.
-        self.plotter.y = xo
-        self.plotter.update_saved()
+        # print(f"\tFront Camera, x: {xo}\ty: {yo}")
+        # self.plotter.y = xo
+        # self.plotter.y = 0
 
         # cv.circle(canvas,(xo, yo), 5, (255, 255, 0), 3)
 

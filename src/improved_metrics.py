@@ -75,7 +75,7 @@ class RealTimePlotter:
         self.x, self.y = None, None
 
         # Create a figure and two subplots side by side
-        self.fig, (self.shotmap, self.heatmap) = plt.subplots(1, 2, figsize=(10, 5))
+        self.fig, (self.shotmap, self.heatmap) = plt.subplots(1, 2, figsize=(20, 10))
 
         # Set the limits for both axes
         self.shotmap.set_xlim([-20, 20])
@@ -229,7 +229,7 @@ class RealTimePlotter:
     # Updates based on internal saved x and y values given by the cameras
     def update_saved(self):
         if self.x != None and self.y != None:
-            print("Visualizing {self.x}, {self.y}")
+            print(f"Visualizing {self.x}, {self.y}")
             self.add_point(self.x, self.y)
             self.reset() # reset x and y to None
 
@@ -321,5 +321,12 @@ class RealTimePlotter:
     def show(self):
         # Show the plot
         plt.ion()
-        plt.show()
+        # self.fig.canvas.draw_idle()
+        self.fig.canvas.draw()
+        plt.pause(0.1)
+        # plt.show()
+
+
+# plotter = RealTimePlotter()
+# plotter.show()
 

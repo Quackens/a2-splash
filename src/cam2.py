@@ -4,7 +4,7 @@ from detect import detect_frame_2 as detect_frame
 import sys
 import numpy as np
 import time
-
+import chime
 from queue_utils import CoordQueue2D, SignalStart
 from pipeline_2d import Pipeline2D_CAM2
 from threading import Thread
@@ -59,6 +59,7 @@ def run_kalman(coord_queue: CoordQueue2D, output_queue: CoordQueue2D, pipeline: 
         if time.time() - last_run > 2:
             print("RESET front cam")
             # output_queue.reset_queue()
+            chime.info()
             pipeline.reset()
             last_run = time.time()
             signal.set_start(False)
@@ -81,13 +82,13 @@ def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: Sig
     fps = 0
     while True:
         
-        counter+=1
-        current_time = time.monotonic()
-        if (current_time - startTime) > 1 :
-            fps = counter / (current_time - startTime)
-            counter = 0
-            startTime = current_time
-        # print(f"FPS: {fps}")
+        # counter+=1
+        # current_time = time.monotonic()
+        # if (current_time - startTime) > 1 :
+        #     fps = counter / (current_time - startTime)
+        #     counter = 0
+        #     startTime = current_time
+        # print(f"FRONT FPS: {fps}")
 
         _, frame = cap.read()
         frame = cv2.flip(frame, 0)
@@ -95,7 +96,7 @@ def run_cam2(pipeline: Pipeline2D_CAM2, output_queue : CoordQueue2D, signal: Sig
         frame = frame[:, 710:1210]
 
 
-        key = cv2.waitKey(1)
+        # key = cv2.waitKey(1)
         if signal.get_start():
             coord_queue.put_coord(detect_frame(frame))
 

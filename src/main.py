@@ -20,7 +20,81 @@ import math
 
 import gcode.serial_comms_gcode as serial_comms_gcode
 from improved_metrics import RealTimePlotter
+import matplotlib.pyplot as plt
+import matplotlib
+import threading
 
+DEFAULT_XY = 15
+
+def normalize_x(x):
+    from pipeline_2d import CUP_LEFT_X, CUP_RIGHT_X, CUP_CENTRE_X
+    SIDE_LEFT_BOUND = CUP_LEFT_X
+    SIDE_RIGHT_BOUND = CUP_RIGHT_X
+    SIDE_CENTRE = CUP_CENTRE_X
+
+    # Normalize the x coordinate
+    if x <= SIDE_LEFT_BOUND-50:
+        gantry_x = -1 * DEFAULT_XY
+    elif x >= SIDE_RIGHT_BOUND+50:
+        gantry_x = DEFAULT_XY
+
+
+    elif SIDE_RIGHT_BOUND < x < SIDE_RIGHT_BOUND+50:
+        gantry_x = 10
+        # gantry_x = 5
+
+    elif SIDE_LEFT_BOUND-50 < x < SIDE_LEFT_BOUND:
+        gantry_x = -10
+        # gantry_x = -5
+
+    elif SIDE_LEFT_BOUND <= x <=SIDE_RIGHT_BOUND:
+        # gantry_x = (x - SIDE_CENTRE) / 7.5
+
+        # TODO: fix
+        # gantry_x = (x - SIDE_CENTRE) / ((SIDE_RIGHT_BOUND - SIDE_LEFT_BOUND) / 2) * 10
+        if x < SIDE_CENTRE:
+            gantry_x = ((x - SIDE_CENTRE) / (SIDE_CENTRE - SIDE_LEFT_BOUND)) * 10
+        else:
+            gantry_x = ((x - SIDE_CENTRE) / (SIDE_RIGHT_BOUND - SIDE_CENTRE)) * 10
+        
+        if gantry_x < -10: gantry_x = -10
+        if gantry_x > 10: gantry_x = 10
+    else:
+        gantry_x = DEFAULT_XY
+    return gantry_x
+
+def normalize_y(y):
+    from cam2 import LEFT_BOUND, RIGHT_BOUND, CENTRE
+    FRONT_LEFT_BOUND = LEFT_BOUND
+    FRONT_RIGHT_BOUND = RIGHT_BOUND
+    FRONT_CENTRE = CENTRE
+
+    # Normalize the y coordinate    
+    if y <= FRONT_LEFT_BOUND-50:
+        gantry_y = -1 * DEFAULT_XY
+    elif y >= FRONT_RIGHT_BOUND+50:
+        gantry_y = DEFAULT_XY
+
+    if FRONT_RIGHT_BOUND < y < FRONT_RIGHT_BOUND+50:
+        gantry_y = -10
+        # gantry_y = -5
+    elif FRONT_LEFT_BOUND-50 < y < FRONT_LEFT_BOUND:
+        gantry_y = 10
+        # gantry_y = 5
+    elif FRONT_LEFT_BOUND <= y <= FRONT_RIGHT_BOUND:
+        
+        # TODO: fix
+        # gantry_y = (FRONT_CENTRE - y) / ((FRONT_RIGHT_BOUND - FRONT_LEFT_BOUND) / 2) * 10
+        if y < FRONT_CENTRE:
+            gantry_y = ((FRONT_CENTRE - y) / (FRONT_CENTRE - FRONT_LEFT_BOUND)) * 10
+        else:
+            gantry_y = ((FRONT_CENTRE - y) / (FRONT_RIGHT_BOUND - FRONT_CENTRE)) * 10
+
+        if gantry_y < -10: gantry_y = -10
+        if gantry_y > 10: gantry_y = 10
+    else:
+        gantry_y = DEFAULT_XY
+    return gantry_y
 
 def serialize_loop():
 
@@ -156,13 +230,13 @@ def feed_frames():
         while True:
             videoIn = video.get()
             frame = videoIn.getCvFrame()
-            counter+=1
-            current_time = time.monotonic()
-            if (current_time - startTime) > 1 :
-                fps = counter / (current_time - startTime)
-                counter = 0
-                startTime = current_time
-            # print(f"FPS: {fps}")
+            # counter+=1
+            # current_time = time.monotonic()
+            # if (current_time - startTime) > 1 :
+            #     fps = counter / (current_time - startTime)
+            #     counter = 0
+            #     startTime = current_time
+            # print(f"SIDE FPS: {fps}")
 
             coord = detect_frame(frame)
             if coord != None and not signal_cam2.get_start():
@@ -176,13 +250,36 @@ def feed_frames():
             #     else:
             #         f.write("null,\n")
 
+def periodic_plotter_update(plotter):
+    x = 0
+    plotter.show()
+    # while True:
+    #     x += 1
+    #     print(f"Checking for updates, local_x={x}, x: {plotter.x}, y: {plotter.y}")
+    #     time.sleep(5)
+    #     # with threading.Lock():
+    #     plotter.add_point(x, 0)
+    while True:
+        time.sleep(5)
+        print(f"    Checking for updates, side: {plotter.x}, front: {plotter.y}")
+        if (plotter.x != None and plotter.y != None):
+            # graph_y = -1 * normalize_x(plotter.x)
+            # graph_x = normalize_y(plotter.y)
+            # plotter.add_point(graph_x, graph_y)
+
+            graph_y = -1 * normalize_x(plotter.x)
+            graph_x = normalize_y(plotter.y)
+            plotter.add_point(graph_x, graph_y)
+            plotter.reset()
+            print(f"    **Plotting normalized graph_x: {graph_x}, graph_y: {graph_y}**")
+        plotter.update_saved()
 
 if __name__ == '__main__':
+    # matplotlib.use('macosx')
     s = None
     grbl = False
     # global plotter
     plotter = RealTimePlotter()
-    plotter.show()
     
     ################# Prediction Pipeline Setup #################
     # frame_queue = FrameQueue()
@@ -229,19 +326,29 @@ if __name__ == '__main__':
         Thread(target=predict.run, args=(s,)).start()
 
         # Front camera prediction pipeline
-        run_cam2(pipeline_cam2, result_queue_cam2, signal_cam2)
-       
+        # run_cam2(pipeline_cam2, result_queue_cam2, signal_cam2)
+        Thread(target=run_cam2, args=(pipeline_cam2, result_queue_cam2, signal_cam2, )).start()
 
-    elif sys.argv[1] == "test":
-        # Load in json file
-        with open("datalist.json", "r") as f:
-            data = json.load(f)
+        Thread(target=periodic_plotter_update(plotter)).start()
+
+
+    # # x = 0
+    # while True:
+    #     time.sleep(5)
+    #     print("Checking for updates")
+    #     # if (plotter.x != None and plotter.y != None):
+    #         # plotter.x = normalize_x(plotter.x)
+    #         # plotter.y = normalize_y(plotter.y)
+    #     plotter.update_saved()
+    #     # x += 1
+
+    # elif sys.argv[1] == "test":
+    #     # Load in json file
+    #     with open("datalist.json", "r") as f:
+    #         data = json.load(f)
         
-        Thread(target=serialize_loop).start()
-        predict.test(data[sys.argv[2]])
-
-
-
+    #     Thread(target=serialize_loop).start()
+    #     predict.test(data[sys.argv[2]])
 
             
     # TODO: Uncomment to integrate serial
